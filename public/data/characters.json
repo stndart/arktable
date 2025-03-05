@@ -1,0 +1,28 @@
+{
+    "characters": [
+        {
+            "id": "wizadel",
+            "name": "Wiz'adel",
+            "class": "Sniper",
+            "subclass": "Flinger",
+            "rarity": 6,
+            "image": "wizadel.png"
+        },
+        {
+            "id": "adel",
+            "name": "Eyjafjalla",
+            "class": "Caster",
+            "subclass": "Core",
+            "rarity": 6,
+            "image": "adel.png"
+        }
+    ]
+}
+  
+{
+    "layout": ["wizadel", "adel", ...],
+    "marks": {
+        "wizadel": {checks: 1, circles: 2},
+        "adel": {checks: 1, circles: 1}
+    }
+}
