@@ -24,30 +24,33 @@ class GridManager {
 
   async loadDefaultProfile() {
       try {
-          const overlay = document.getElementById('loadingOverlay');
-          overlay.style.display = 'flex';
-          
-          const response = await fetch('/data/profiles/profile_table.json');
-          const defaultProfile = await response.json();
-          
-          // Clear current grid
+          // Clear existing grid
           this.grid.innerHTML = '';
+
+          // Load data
+          const [profileRes, charsRes] = await Promise.all([
+            fetch('/data/profiles/profile_table.json'),
+            fetch('/api/characters')
+          ]);
+        
+          const profile = await profileRes.json();
+          const { characters } = await charsRes.json();
+        
+          // Create ID map for quick lookup
+          const characterMap = new Map(characters.map(c => [c.id, c]));
           
-          // Load characters from profile
-          const characters = await this.loadCharacterData();
-          defaultProfile.layout.forEach(charId => {
-              const char = characters.find(c => c.id === charId);
-              if (char) {
-                  const cell = this.createCharacterCell(char);
+          // Add unique characters in order
+          const uniqueIDs = [...new Set(profile.layout)];
+          uniqueIDs.forEach(charId => {
+              if (characterMap.has(charId)) {
+                  const cell = this.createCharacterCell(characterMap.get(charId));
                   this.grid.appendChild(cell);
               }
           });
 
           // Apply marks
-          this.state.marks = defaultProfile.marks;
+          this.state.marks = profile.marks;
           this.applyState();
-          
-          overlay.style.display = 'none';
       } catch (error) {
           console.error('Error loading profile:', error);
       }

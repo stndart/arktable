@@ -1,11 +1,16 @@
 class AdminManager {
   constructor() {
       // Verify admin access
+      // Get token from URL
       const urlParams = new URLSearchParams(window.location.search);
-      if (urlParams.get('token') !== process.env.ADMIN_TOKEN) {
-          window.location = '/'; // Redirect if unauthorized
-      }
+      this.adminToken = urlParams.get('token');
       
+      // Validate token presence
+      if (!this.adminToken) {
+          window.location.href = '/';
+          return;
+      }
+
       this.form = document.getElementById('adminForm');
       this.initEventListeners();
   }
@@ -19,10 +24,12 @@ class AdminManager {
               const response = await fetch('/admin/add', {
                   method: 'POST',
                   headers: {
-                      'Authorization': process.env.ADMIN_TOKEN
+                      'Authorization': `Bearer ${this.adminToken}`
                   },
                   body: formData
               });
+
+              console.log(response);
               
               if (response.ok) {
                   alert('Character added successfully!');

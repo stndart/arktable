@@ -85,15 +85,19 @@ app.get('/api/share/:id', async (req, res) => {
 
 // Admin endpoints
 app.post('/admin/add', upload.single('image'), async (req, res) => {
-    if (req.headers.authorization !== process.env.ADMIN_TOKEN) {
+    console.log("admin add");
+    const token = req.headers.authorization?.split(' ')[1];
+    if (token !== process.env.ADMIN_TOKEN) {
+        console.log("unauthorized")
         return res.status(403).send('Unauthorized');
     }
 
-    const { name, class: charClass, rarity } = req.body;
+    const { name, class: charClass, subclass: charSubclass, rarity } = req.body;
     const newChar = {
         id: `char_${Date.now()}`,
         name,
         class: charClass,
+        subclass: charSubclass,
         rarity,
         image: `${req.file.filename}.png`
     };
@@ -102,10 +106,16 @@ app.post('/admin/add', upload.single('image'), async (req, res) => {
     const finalPath = path.join(__dirname, 'public/characters', newChar.image);
     await fs.rename(req.file.path, finalPath);
 
+    console.log(req.file.path);
+    console.log(finalPath);
+
     // Update metadata
     const data = JSON.parse(await fs.readFile(CHAR_DATA_FILE));
     data.characters.push(newChar);
     await fs.writeFile(CHAR_DATA_FILE, JSON.stringify(data));
+
+    console.log(CHAR_DATA_FILE);
+    console.log(JSON.stringify(data));
 
     res.json(newChar);
 });
