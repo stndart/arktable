@@ -18,11 +18,3 @@
         }
     ]
 }
-  
-{
-    "layout": ["wizadel", "adel", ...],
-    "marks": {
-        "wizadel": {checks: 1, circles: 2},
-        "adel": {checks: 1, circles: 1}
-    }
-}

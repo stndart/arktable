@@ -4,6 +4,7 @@ const fs = require('fs').promises;
 const path = require('path');
 const multer = require('multer');
 const cookieParser = require('cookie-parser');
+const { Console } = require('console');
 
 const app = express();
 const upload = multer({ 
@@ -28,6 +29,19 @@ async function init() {
     if (!await fileExists(CHAR_DATA_FILE)) {
         await fs.writeFile(CHAR_DATA_FILE, JSON.stringify({ characters: [] }));
     }
+    
+    // Create default profile if missing
+    const PROFILE_FILE = path.join(DATA_PATH, 'profiles/profile_table.json');
+    if (!await fileExists(PROFILE_FILE)) {
+        await fs.mkdir(path.dirname(PROFILE_FILE), { recursive: true });
+        await fs.writeFile(PROFILE_FILE, JSON.stringify({
+            layout: ["char_001", "char_002"],
+            marks: {
+                "char_001": { checks: true, circles: 2 },
+                "char_002": { checks: false, circles: 0 }
+            }
+        }));
+    }
 }
 
 // API Endpoints
@@ -39,6 +53,7 @@ app.get('/api/characters', async (req, res) => {
         res.json(JSON.parse(data));
     } catch (error) {
         res.status(500).send('Error loading characters');
+        Console.log(error);
     }
 });
 

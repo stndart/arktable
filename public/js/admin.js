@@ -1,5 +1,11 @@
 class AdminManager {
   constructor() {
+      // Verify admin access
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('token') !== process.env.ADMIN_TOKEN) {
+          window.location = '/'; // Redirect if unauthorized
+      }
+      
       this.form = document.getElementById('adminForm');
       this.initEventListeners();
   }

@@ -6,13 +6,57 @@ class GridManager {
           marks: {}
       };
       
+      // Get control buttons
+      this.saveBtn = document.getElementById('save');
+      this.addBtn = document.getElementById('addCharacter');
+      this.deleteBtn = document.getElementById('deleteMode');
+      this.loadDefaultBtn = document.getElementById('loadDefault');
+
       this.init();
   }
 
   async init() {
+      await this.loadDefaultProfile();
       await this.loadCharacters();
       this.loadState();
       this.setupEventListeners();
+  }
+
+  async loadDefaultProfile() {
+      try {
+          const overlay = document.getElementById('loadingOverlay');
+          overlay.style.display = 'flex';
+          
+          const response = await fetch('/data/profiles/profile_table.json');
+          const defaultProfile = await response.json();
+          
+          // Clear current grid
+          this.grid.innerHTML = '';
+          
+          // Load characters from profile
+          const characters = await this.loadCharacterData();
+          defaultProfile.layout.forEach(charId => {
+              const char = characters.find(c => c.id === charId);
+              if (char) {
+                  const cell = this.createCharacterCell(char);
+                  this.grid.appendChild(cell);
+              }
+          });
+
+          // Apply marks
+          this.state.marks = defaultProfile.marks;
+          this.applyState();
+          
+          overlay.style.display = 'none';
+      } catch (error) {
+          console.error('Error loading profile:', error);
+      }
+  }
+
+  async loadCharacterData() {
+      const response = await fetch('/api/characters');
+      const data = await response.json();
+      return data.characters;
   }
 
   async loadCharacters() {
@@ -26,22 +70,14 @@ class GridManager {
       }
   }
 
-  renderGrid() {
-      this.grid.innerHTML = '';
-      this.characters.forEach(character => {
-          const cell = this.createCharacterCell(character);
-          this.grid.appendChild(cell);
-      });
-  }
-
   createCharacterCell(character) {
       const cell = document.createElement('div');
       cell.className = 'character-cell';
-      cell.draggable = true;
       cell.dataset.id = character.id;
-      
+      cell.draggable = true;
+
       cell.innerHTML = `
-          <div class="check-mark">✓</div>
+          <div class="check-mark"></div>
           <img src="/characters/${character.image}" class="character-image">
           <div class="circles">
               <div class="circle"></div>
@@ -53,7 +89,41 @@ class GridManager {
       return cell;
   }
 
+  toggleDeleteMode() {
+      const isActive = this.deleteBtn.classList.toggle('destruction-on');
+      this.grid.classList.toggle('delete-mode', isActive);
+      this.deleteBtn.textContent = isActive ? 'Cancel Delete' : 'Delete Mode';
+      
+      // Set temporary click handler
+      if (isActive) {
+          this.grid.addEventListener('click', this.handleDelete.bind(this), { once: true });
+      }
+  }
+
+  handleDelete(e) {
+      const cell = e.target.closest('.character-cell');
+      if (cell) {
+          cell.remove();
+          this.saveState();
+      }
+      this.toggleDeleteMode(); // Reset mode
+  }
+
+  renderGrid() {
+      this.grid.innerHTML = '';
+      this.characters.forEach(character => {
+          const cell = this.createCharacterCell(character);
+          this.grid.appendChild(cell);
+      });
+  }
+
   setupEventListeners() {
+      // Control Buttons
+      this.saveBtn.addEventListener('click', () => this.saveState());
+      this.addBtn.addEventListener('click', () => this.addNewCharacter());
+      this.deleteBtn.addEventListener('click', () => this.toggleDeleteMode());
+      this.loadDefaultBtn.addEventListener('click', () => this.loadDefaultProfile());
+      
       // Check marks
       this.grid.addEventListener('click', e => {
           const cell = e.target.closest('.character-cell');
@@ -88,6 +158,19 @@ class GridManager {
           e.target.classList.remove('dragging');
           this.saveState();
       });
+  }
+
+  async addNewCharacter() {
+      // Simple implementation - add random character
+      const newChar = {
+          id: `char_${Date.now()}`,
+          name: "New Character",
+          image: "default.png"
+      };
+      
+      const cell = this.createCharacterCell(newChar);
+      this.grid.appendChild(cell);
+      await this.saveState();
   }
 
   toggleCheckMark(cell) {
@@ -187,3 +270,14 @@ class GridManager {
 
 // Initialize grid manager
 const gridManager = new GridManager();
+
+// Add profile loading button handler
+document.getElementById('loadDefault').addEventListener('click', async () => {
+  const overlay = document.createElement('div');
+  overlay.className = 'loading-overlay';
+  overlay.textContent = 'Loading Default Profile...';
+  document.body.appendChild(overlay);
+  
+  await gridManager.loadDefaultProfile();
+  overlay.remove();
+});
