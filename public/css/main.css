@@ -194,3 +194,49 @@ button:hover {
     align-items: center;
     z-index: 1000;
 }
+
+/* Share Dialog */
+.share-dialog {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.2);
+    z-index: 1000;
+}
+
+.share-dialog input {
+    width: 300px;
+    padding: 8px;
+    margin: 5px;
+    border: 1px solid #ddd;
+}
+
+.share-dialog button {
+    padding: 8px 12px;
+    background: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+/* Import Button */
+#importProfile {
+    position: relative;
+    overflow: hidden;
+    display: inline-block;
+}
+
+#importProfile input[type="file"] {
+    position: absolute;
+    left: 0;
+    top: 0;
+    opacity: 0;
+    cursor: pointer;
+    height: 100%;
+    width: 100%;
+}

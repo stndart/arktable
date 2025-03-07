@@ -5,6 +5,7 @@ const path = require('path');
 const multer = require('multer');
 const cookieParser = require('cookie-parser');
 const { Console } = require('console');
+const crypto = require('crypto');
 
 const app = express();
 const upload = multer({ 
@@ -16,6 +17,10 @@ const upload = multer({
 const DATA_PATH = path.join(__dirname, 'public/data');
 const CHAR_DATA_FILE = path.join(DATA_PATH, 'characters.json');
 const SHARED_DIR = path.join(DATA_PATH, 'shared');
+
+app.get('/share/:id', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public/index.html'));
+});
 
 // Middleware
 app.use(express.json());
@@ -64,22 +69,33 @@ app.post('/api/save', async (req, res) => {
     res.sendStatus(200);
 });
 
-// Share state
 app.post('/api/share', async (req, res) => {
-    const shareId = Date.now().toString(36) + Math.random().toString(36).substr(2);
+    const { state, mode } = req.body;
+    const shareId = crypto.randomBytes(8).toString('hex');
     const filePath = path.join(SHARED_DIR, `${shareId}.json`);
-    await fs.writeFile(filePath, JSON.stringify(req.body));
-    res.json({ shareId });
+    
+    await fs.writeFile(filePath, JSON.stringify({
+        state,
+        mode: mode || 'readwrite',
+        created: new Date().toISOString()
+    }));
+    
+    res.json({ 
+        shareId,
+        readwriteLink: `${process.env.BASE_URL}/share/${shareId}?edit=true`,
+        readonlyLink: `${process.env.BASE_URL}/share/${shareId}`
+    });
 });
 
-// Load shared state
 app.get('/api/share/:id', async (req, res) => {
     try {
         const filePath = path.join(SHARED_DIR, `${req.params.id}.json`);
         const data = await fs.readFile(filePath);
-        res.json(JSON.parse(data));
+        const sharedState = JSON.parse(data);
+        res.json(sharedState);
     } catch (error) {
-        res.status(404).send('Shared state not found');
+        res.status(404).send('Shared link not found');
+        console.log("404: Share link not found");
     }
 });
 

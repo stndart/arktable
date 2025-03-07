@@ -1,0 +1,5 @@
+# temporary files
+public/characters/temp/*
+
+# profile cache
+public/data/shared/*
