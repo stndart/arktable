@@ -12,7 +12,7 @@ class GridManager {
         this.addBtn = document.getElementById('addCharacter');
         this.deleteBtn = document.getElementById('deleteMode');
         this.loadDefaultBtn = document.getElementById('loadDefault');
-        
+
         // Add animation frame reference
         this.animationFrame = null;
 
@@ -177,14 +177,24 @@ class GridManager {
 
         this.grid.addEventListener('dragover', e => {
             e.preventDefault();
-            const afterElement = this.getDragAfterElement(e.clientX);
-            const draggable = document.querySelector('.dragging');
-
-            if (afterElement) {
-                this.grid.insertBefore(draggable, afterElement);
-            } else {
-                this.grid.appendChild(draggable);
-            }
+            
+            // Throttle with requestAnimationFrame
+            if (this.animationFrame) return;
+            
+            this.animationFrame = requestAnimationFrame(() => {
+                const afterElement = this.getDragAfterElement(e.clientX);
+                const draggable = document.querySelector('.dragging');
+                
+                if (draggable) {
+                    if (afterElement) {
+                        this.grid.insertBefore(draggable, afterElement);
+                    } else {
+                        this.grid.appendChild(draggable);
+                    }
+                }
+                
+                this.animationFrame = null;
+            });
         });
 
         this.grid.addEventListener('dragend', e => {
