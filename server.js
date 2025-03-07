@@ -93,13 +93,24 @@ app.post('/admin/add', upload.single('image'), async (req, res) => {
     }
 
     const { name, class: charClass, subclass: charSubclass, rarity } = req.body;
+    const id = name.toLowerCase().replace(/[^a-z]/g, '');
+    const filename = `${id}.png`;
+
+    // Read existing data
+    const data = JSON.parse(await fs.readFile(CHAR_DATA_FILE));
+
+    // Check for duplicate id
+    if (data.characters.some(c => c.id === id)) {
+        return res.status(400).json({ error: 'Character with this name already exists' });
+    }
+
     const newChar = {
-        id: `char_${Date.now()}`,
+        id,
         name,
         class: charClass,
         subclass: charSubclass,
         rarity,
-        image: `${req.file.filename}.png`
+        image: filename
     };
 
     // Move and rename uploaded file
@@ -109,14 +120,13 @@ app.post('/admin/add', upload.single('image'), async (req, res) => {
     console.log(req.file.path);
     console.log(finalPath);
 
-    // Update metadata
-    const data = JSON.parse(await fs.readFile(CHAR_DATA_FILE));
+    // Add new character and update metadata
     data.characters.push(newChar);
-    await fs.writeFile(CHAR_DATA_FILE, JSON.stringify(data));
-
+    await fs.writeFile(CHAR_DATA_FILE, JSON.stringify(data, null, 4));
+    
     console.log(CHAR_DATA_FILE);
     console.log(JSON.stringify(data));
-
+    
     res.json(newChar);
 });
 
