@@ -12,6 +12,9 @@ class GridManager {
         this.addBtn = document.getElementById('addCharacter');
         this.deleteBtn = document.getElementById('deleteMode');
         this.loadDefaultBtn = document.getElementById('loadDefault');
+        
+        // Add animation frame reference
+        this.animationFrame = null;
 
         this.init();
     }
@@ -129,6 +132,21 @@ class GridManager {
             this.saveState();
         }
     }
+    
+    getDragAfterElement(horizontalPosition) {
+        const draggableElements = [...this.grid.querySelectorAll('.character-cell:not(.dragging)')];
+        
+        return draggableElements.reduce((closest, child) => {
+            const box = child.getBoundingClientRect();
+            const offset = horizontalPosition - box.left - box.width / 2;
+            
+            if (offset < 0 && offset > closest.offset) {
+                return { offset: offset, element: child };
+            } else {
+                return closest;
+            }
+        }, { offset: Number.NEGATIVE_INFINITY }).element;
+    }
 
     setupEventListeners() {
         // Control Buttons
@@ -153,13 +171,15 @@ class GridManager {
         // Drag & Drop
         this.grid.addEventListener('dragstart', e => {
             e.target.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
             e.dataTransfer.setData('text/plain', e.target.dataset.id);
         });
 
         this.grid.addEventListener('dragover', e => {
             e.preventDefault();
-            const afterElement = this.getDragAfterElement(e.clientY);
+            const afterElement = this.getDragAfterElement(e.clientX);
             const draggable = document.querySelector('.dragging');
+
             if (afterElement) {
                 this.grid.insertBefore(draggable, afterElement);
             } else {
@@ -169,6 +189,8 @@ class GridManager {
 
         this.grid.addEventListener('dragend', e => {
             e.target.classList.remove('dragging');
+            const placeholder = document.querySelector('.placeholder');
+            if (placeholder) placeholder.remove();
             this.saveState();
         });
     }

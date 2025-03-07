@@ -27,7 +27,13 @@ body {
     border: 2px solid #ddd;
     border-radius: 8px;
     padding: 10px;
-    transition: transform 0.2s, box-shadow 0.2s;
+    transition: transform 0.2s ease, opacity 0.2s ease, box-shadow 0.2s;
+}
+
+.dragging {
+    opacity: 0.5;
+    transform: scale(0.95);
+    z-index: 1000;
 }
 
 .character-cell:hover {
@@ -111,12 +117,6 @@ button {
 
 button:hover {
     opacity: 0.9;
-}
-
-/* Drag & Drop */
-.dragging {
-    opacity: 0.5;
-    transform: scale(0.95);
 }
 
 /* Context Menu */
