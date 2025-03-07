@@ -5,6 +5,7 @@ class GridManager {
             layout: [],
             marks: {}
         };
+        this.characterMap = new Map();
         
         // Get control buttons
         this.saveBtn = document.getElementById('save');
@@ -30,13 +31,9 @@ class GridManager {
         // console.log("Loading default profile.");
 
         try {
-            // Clear existing grid
-            this.grid.innerHTML = '';
-
             // Load data
-            const [profileRes, charsRes] = await Promise.all([
-                fetch('/data/profiles/default.json'),
-                fetch('/api/characters')
+            const [profileRes] = await Promise.all([
+                fetch('/data/profiles/default.json')
             ]);
             
             // ensure characters are loaded
@@ -46,21 +43,9 @@ class GridManager {
             }
         
             const profile = await profileRes.json();
-            const { characters } = await charsRes.json();
-        
-            // Create ID map for quick lookup
-            const characterMap = new Map(characters.map(c => [c.id, c]));
-            
             // console.log("Loaded default layout:", profile.layout);
 
-            // Add unique characters in order
-            const uniqueIDs = [...new Set(profile.layout)];
-            uniqueIDs.forEach(charId => {
-                if (characterMap.has(charId)) {
-                    const cell = this.createCharacterCell(characterMap.get(charId));
-                    this.grid.appendChild(cell);
-                }
-            });
+            this.applyLayout(profile.layout);
 
             this.state.layout = profile.layout;
             this.state.marks = profile.marks;
@@ -81,17 +66,20 @@ class GridManager {
             const response = await fetch('/api/characters');
             const { characters } = await response.json();
             this.characters = characters;
+            // Create ID map for quick lookup
+            this.characterMap = new Map(this.characters.map(c => [c.id, c]));
         } catch (error) {
             console.error('Error loading characters:', error);
         }
     }
 
     async ensureCharactersLoaded() {
-        if (!this.characters || this.characters.length === 0) {
+        if (!this.characters || this.characters.length === 0 || !this.characterMap) {
             await this.loadCharacters(); // Ensure characters are loaded
+            console.log("onload", this.characterMap);
         }
     
-        if (!this.characters || this.characters.length === 0) {
+        if (!this.characters || this.characters.length === 0 || !this.characterMap) {
             console.error("Characters could not be loaded.");
             return false; // Return false to signal failure
         }
@@ -201,14 +189,10 @@ class GridManager {
             console.warn("No available characters to add");
             return;
         }
-        
-        console.log('available', availableCharacters);
     
         // Pick random character
         const randomIndex = Math.floor(Math.random() * availableCharacters.length);
         const newChar = availableCharacters[randomIndex];
-    
-        console.log(`Adding character ${newChar.id}`);
     
         const cell = this.createCharacterCell(newChar);
         this.grid.appendChild(cell);
@@ -251,7 +235,6 @@ class GridManager {
             console.log(`attempt to add show while op is ${circle.style.opacity} and classlist is ${circle.classList}`);
             if (!circle.classList.contains('show')) {
                 circle.classList.add('show');
-                console.log("adding show");
                 break;
             }
         }
@@ -270,14 +253,29 @@ class GridManager {
         this.saveState();
     }
 
+    applyLayout() {
+        // Clear existing grid
+        this.grid.innerHTML = '';
+        
+        // Add unique characters in order
+        const uniqueIDs = [...new Set(this.state.layout)];
+        uniqueIDs.forEach(charId => {
+            if (this.characterMap.has(charId)) {
+                const cell = this.createCharacterCell(this.characterMap.get(charId));
+                this.grid.appendChild(cell);
+            }
+        });
+    }
+
     loadState() {
         console.log("Loading state from cookies.");
-        console.warn("Loading from cookies is disabled.");
-        return;
+        // console.warn("Loading from cookies is disabled.");
+        // return;
 
         const cookieState = document.cookie.match(/userState=([^;]+)/);
         if (cookieState) {
             this.state = JSON.parse(decodeURIComponent(cookieState[1]));
+            this.applyLayout();
             this.applyState();
         }
         
