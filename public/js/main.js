@@ -35,9 +35,15 @@ class GridManager {
 
             // Load data
             const [profileRes, charsRes] = await Promise.all([
-                fetch('/data/profiles/profile_table.json'),
+                fetch('/data/profiles/default.json'),
                 fetch('/api/characters')
             ]);
+            
+            // ensure characters are loaded
+            if (!await this.ensureCharactersLoaded()) {
+                console.error("Interrupting loading default profile.");
+                return; // If characters are not loaded, exit early
+            }
         
             const profile = await profileRes.json();
             const { characters } = await charsRes.json();
@@ -78,6 +84,19 @@ class GridManager {
         } catch (error) {
             console.error('Error loading characters:', error);
         }
+    }
+
+    async ensureCharactersLoaded() {
+        if (!this.characters || this.characters.length === 0) {
+            await this.loadCharacters(); // Ensure characters are loaded
+        }
+    
+        if (!this.characters || this.characters.length === 0) {
+            console.error("Characters could not be loaded.");
+            return false; // Return false to signal failure
+        }
+    
+        return true; // Return true if characters are loaded
     }
 
     createCharacterCell(character) {

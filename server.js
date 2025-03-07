@@ -31,14 +31,14 @@ async function init() {
     }
     
     // Create default profile if missing
-    const PROFILE_FILE = path.join(DATA_PATH, 'profiles/profile_table.json');
+    const PROFILE_FILE = path.join(DATA_PATH, 'profiles/default.json');
     if (!await fileExists(PROFILE_FILE)) {
         await fs.mkdir(path.dirname(PROFILE_FILE), { recursive: true });
         await fs.writeFile(PROFILE_FILE, JSON.stringify({
-            layout: ["char_001", "char_002"],
+            layout: ["wizadel", "schwarz"],
             marks: {
-                "char_001": { checks: true, circles: 2 },
-                "char_002": { checks: false, circles: 0 }
+                "wizadel": { checks: true, circles: 2 },
+                "schwarz": { checks: false, circles: 0 }
             }
         }));
     }
