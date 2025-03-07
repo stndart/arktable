@@ -13,6 +13,8 @@ class GridManager {
         this.deleteBtn = document.getElementById('deleteMode');
         this.loadDefaultBtn = document.getElementById('loadDefault');
 
+        this.handleDeleteBound = this.handleDelete.bind(this); // Store bound function once
+
         // Add animation frame reference
         this.animationFrame = null;
 
@@ -118,10 +120,9 @@ class GridManager {
     
         // Add or remove click handler depending on the state
         if (isActive) {
-            this.grid.addEventListener('click', this.handleDelete.bind(this));
+            this.grid.addEventListener('click', this.handleDeleteBound);
         } else {
-            // Optionally, remove the event listener if turning off delete mode
-            this.grid.removeEventListener('click', this.handleDelete.bind(this));
+            this.grid.removeEventListener('click', this.handleDeleteBound);
         }
     }
     
@@ -131,6 +132,11 @@ class GridManager {
             cell.remove();
             this.saveState();
         }
+    }
+
+    handleToggle(e) {
+        const cell = e.target.closest('.character-cell');
+        if (cell) this.toggleCheckMark(cell);
     }
     
     getDragAfterElement(horizontalPosition) {
@@ -156,10 +162,7 @@ class GridManager {
         this.loadDefaultBtn.addEventListener('click', () => this.loadDefaultProfile());
         
         // Check marks
-        this.grid.addEventListener('click', e => {
-            const cell = e.target.closest('.character-cell');
-            if (cell) this.toggleCheckMark(cell);
-        });
+        this.grid.addEventListener('click', this.handleToggle.bind(this));
 
         // Right-click context menu
         this.grid.addEventListener('contextmenu', e => {
