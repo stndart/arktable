@@ -148,6 +148,17 @@ class GridManager {
         }, { offset: Number.NEGATIVE_INFINITY }).element;
     }
 
+    getDragAfterIndex(xPos) {
+        const cells = [...this.grid.children].filter(c => !c.classList.contains('dragging'));
+        return cells.reduce((closest, child, index) => {
+            const box = child.getBoundingClientRect();
+            const offset = xPos - box.left - box.width / 2;
+            return offset < 0 && offset > closest.offset 
+                ? { offset: offset, index: index } 
+                : closest;
+        }, { offset: Number.NEGATIVE_INFINITY, index: cells.length }).index;
+    }
+
     setupEventListeners() {
         // Control Buttons
         this.saveBtn.addEventListener('click', () => this.saveStateToServer());
@@ -169,38 +180,65 @@ class GridManager {
         });
 
         // Drag & Drop
+        // Drag Start
         this.grid.addEventListener('dragstart', e => {
-            e.target.classList.add('dragging');
-            e.dataTransfer.effectAllowed = 'move';
-            e.dataTransfer.setData('text/plain', e.target.dataset.id);
+            const cell = e.target.closest('.character-cell');
+            if (!cell) return;
+            
+            this.isDragging = true;
+            cell.classList.add('dragging');
+            this.dragCurrentIndex = [...this.grid.children].indexOf(cell);
+            
+            // Set ghost image
+            e.dataTransfer.setDragImage(new Image(), 0, 0);
         });
 
+        // Drag Over
         this.grid.addEventListener('dragover', e => {
             e.preventDefault();
-            
-            // Throttle with requestAnimationFrame
-            if (this.animationFrame) return;
-            
-            this.animationFrame = requestAnimationFrame(() => {
-                const afterElement = this.getDragAfterElement(e.clientX);
-                const draggable = document.querySelector('.dragging');
+            if (!this.isDragging) return;
+
+            const cells = [...this.grid.children];
+            const draggingCell = this.grid.querySelector('.dragging');
+            const dragAfterIndex = this.getDragAfterIndex(e.clientX);
+
+            // Prevent same position updates
+            if (dragAfterIndex === this.dragCurrentIndex) return;
+
+            // Animate other cells
+            cells.forEach((cell, index) => {
+                if (cell === draggingCell) return;
                 
-                if (draggable) {
-                    if (afterElement) {
-                        this.grid.insertBefore(draggable, afterElement);
-                    } else {
-                        this.grid.appendChild(draggable);
-                    }
-                }
-                
-                this.animationFrame = null;
+                const offset = index < this.dragCurrentIndex 
+                    ? (index >= dragAfterIndex ? 1 : 0)
+                    : (index <= dragAfterIndex ? -1 : 0);
+
+                cell.style.transform = `translateX(${offset * draggingCell.offsetHeight}px)`;
             });
+
+            this.dragCurrentIndex = dragAfterIndex;
         });
 
+        // Drag End
         this.grid.addEventListener('dragend', e => {
-            e.target.classList.remove('dragging');
-            const placeholder = document.querySelector('.placeholder');
-            if (placeholder) placeholder.remove();
+            const draggingCell = this.grid.querySelector('.dragging');
+            if (!draggingCell) return;
+
+            this.isDragging = false;
+            const cells = [...this.grid.children];
+            
+            // Reset transforms
+            cells.forEach(cell => cell.style.transform = '');
+            
+            // Actually move the DOM element
+            if (this.dragCurrentIndex >= 0) {
+                const targetCell = cells[this.dragCurrentIndex];
+                if (targetCell !== draggingCell) {
+                    this.grid.insertBefore(draggingCell, targetCell);
+                }
+            }
+
+            draggingCell.classList.remove('dragging');
             this.saveState();
         });
     }
