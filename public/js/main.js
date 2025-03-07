@@ -112,28 +112,22 @@ class GridManager {
         const isActive = this.deleteBtn.classList.toggle('destruction-on');
         this.grid.classList.toggle('delete-mode', isActive);
         this.deleteBtn.textContent = isActive ? 'Cancel Delete' : 'Delete Mode';
-        
-        // Set temporary click handler
+    
+        // Add or remove click handler depending on the state
         if (isActive) {
-            this.grid.addEventListener('click', this.handleDelete.bind(this), { once: true });
+            this.grid.addEventListener('click', this.handleDelete.bind(this));
+        } else {
+            // Optionally, remove the event listener if turning off delete mode
+            this.grid.removeEventListener('click', this.handleDelete.bind(this));
         }
     }
-
+    
     handleDelete(e) {
         const cell = e.target.closest('.character-cell');
         if (cell) {
             cell.remove();
             this.saveState();
         }
-        this.toggleDeleteMode(); // Reset mode
-    }
-
-    renderGrid() {
-        this.grid.innerHTML = '';
-        this.state.layout.forEach(character => {
-            const cell = this.createCharacterCell(character);
-            this.grid.appendChild(cell);
-        });
     }
 
     setupEventListeners() {
