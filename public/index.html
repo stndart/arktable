@@ -9,6 +9,12 @@
 <body>
     <div class="controls">
         <button id="save" title="Save current layout">Save Layout</button>
+        <button id="share" title="Share current layout">Share</button>
+        <!-- <label id="importProfile" class="button">
+            Import
+            <input type="file" accept=".json" hidden>
+        </label> -->
+        <button onclick="gridManager.exportToFile()">Export</button>
         <button id="addCharacter" title="Add new character">Add Character</button>
         <button id="deleteMode" class="destruction-off" title="Delete characters">Delete Mode</button>
         <button id="loadDefault" title="Load default configuration">Load Default Profile</button>

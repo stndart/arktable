@@ -359,6 +359,75 @@ class GridManager {
             body: JSON.stringify(this.state)
         });
     }
+    
+    async shareGrid(mode = 'readwrite') {
+        const state = this.state;
+        try {
+            const response = await fetch('/api/share', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ state, mode })
+            });
+            const { shareId } = await response.json();
+            this.showShareDialog(shareId, mode);
+        } catch (error) {
+            console.error('Sharing failed:', error);
+        }
+    }
+
+    showShareDialog(shareId, mode) {
+        const baseUrl = `${window.location.origin}/share/${shareId}`;
+        const readWriteUrl = `${baseUrl}?edit=true`;
+        const readOnlyUrl = `${baseUrl}?edit=false`;
+        
+        const dialog = document.createElement('div');
+        dialog.className = 'share-dialog';
+        dialog.innerHTML = `
+            <h3>Share Link</h3>
+            <div class="share-options">
+                <div>
+                    <label>Read-Write:</label>
+                    <input type="text" value="${readWriteUrl}" readonly>
+                    <button onclick="navigator.clipboard.writeText('${readWriteUrl}')">Copy</button>
+                </div>
+                <div>
+                    <label>Read-Only:</label>
+                    <input type="text" value="${readOnlyUrl}" readonly>
+                    <button onclick="navigator.clipboard.writeText('${readOnlyUrl}')">Copy</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(dialog);
+    }
+
+    exportToFile() {
+        const state = this.state;
+        const blob = new Blob([JSON.stringify(state)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `grid-profile-${Date.now()}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    async importFromFile(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const state = JSON.parse(e.target.result);
+                    await this.loadState(state);
+                    resolve();
+                } catch (error) {
+                    reject('Invalid profile file');
+                }
+            };
+            reader.readAsText(file);
+        });
+    }
 }
 
 // Initialize grid manager

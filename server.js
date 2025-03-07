@@ -83,6 +83,14 @@ app.get('/api/share/:id', async (req, res) => {
     }
 });
 
+app.post('/api/export', async (req, res) => {
+    const state = req.body;
+    const fileName = `grid-profile-${Date.now()}.json`;
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    res.send(JSON.stringify(state));
+});
+
 // Admin endpoints
 app.post('/admin/add', upload.single('image'), async (req, res) => {
     console.log("admin add");
