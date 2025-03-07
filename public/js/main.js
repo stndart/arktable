@@ -108,12 +108,12 @@ class GridManager {
         cell.draggable = true;
 
         cell.innerHTML = `
-            <div class="check-mark"></div>
+            <div class="check-mark" style="display: none;"></div>
             <img src="/characters/${character.image}" class="character-image">
             <div class="circles">
-                <div class="circle"></div>
-                <div class="circle"></div>
-                <div class="circle"></div>
+                <div class="circle" style="display: none;"></div>
+                <div class="circle" style="display: none;"></div>
+                <div class="circle" style="display: none;"></div>
             </div>
         `;
 
@@ -150,7 +150,7 @@ class GridManager {
 
     setupEventListeners() {
         // Control Buttons
-        this.saveBtn.addEventListener('click', () => this.saveState());
+        this.saveBtn.addEventListener('click', () => this.saveStateToServer());
         this.addBtn.addEventListener('click', () => this.addNewCharacter());
         this.deleteBtn.addEventListener('click', () => this.toggleDeleteMode());
         this.loadDefaultBtn.addEventListener('click', () => this.loadDefaultProfile());
@@ -194,13 +194,15 @@ class GridManager {
     async addNewCharacter() {
         // Filter out characters already in layout
         const availableCharacters = this.characters.filter(c =>
-            !this.state.layout.some(l => l.id === c.id)
+            !this.state.layout.some(l => l === c.id)
         );
     
         if (availableCharacters.length === 0) {
-            console.log("No available characters to add");
+            console.warn("No available characters to add");
             return;
         }
+        
+        console.log('available', availableCharacters);
     
         // Pick random character
         const randomIndex = Math.floor(Math.random() * availableCharacters.length);
@@ -210,11 +212,10 @@ class GridManager {
     
         const cell = this.createCharacterCell(newChar);
         this.grid.appendChild(cell);
-        this.state.layout.push(newChar);
+        this.state.layout.push(newChar.id);
         await this.saveState();
     }
     
-
     toggleCheckMark(cell) {
         const checkMark = cell.querySelector('.check-mark');
         checkMark.style.display = checkMark.style.display === 'none' ? 'block' : 'none';
@@ -307,11 +308,15 @@ class GridManager {
             };
         });
 
+        this.state = state;
+    }
+
+    async saveStateToServer() {
         // Save to cookie and server
         await fetch('/api/save', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(state)
+            body: JSON.stringify(this.state)
         });
     }
 }
