@@ -26,6 +26,17 @@
     </div>
     
     <div id="characterGrid" class="grid"></div>
+    
+    <div class="sidebar-container" id="sidebarContainer">
+        <div class="sidebar-header">
+            <h3>Add Characters</h3>
+            <button class="close-sidebar" onclick="sidebarManager.toggleSidebar()">&times;</button>
+        </div>
+        <div class="search-container">
+            <input type="text" id="searchInput" placeholder="Search characters..." class="search-field">
+        </div>
+        <div class="sidebar-grid" id="sidebarGrid"></div>
+    </div>
 
     <!-- Context Menu Template -->
     <div class="context-menu" id="contextMenu" style="display: none;">
@@ -40,5 +51,6 @@
 
     <script src="/js/main.js"></script>
     <script src="/js/share.js"></script>
+    <script src="/js/sidebar.js"></script>
 </body>
 </html>

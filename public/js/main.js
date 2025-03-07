@@ -40,9 +40,16 @@ class GridManager {
         if (!this.isSharedPage) { // to avoid overwrite local save
             document.getElementById('save').addEventListener('click', () => this.saveStateToServer());
         }
-        document.getElementById('addCharacter').addEventListener('click', () => this.addNewCharacter());
-        document.getElementById('deleteMode').addEventListener('click', () => this.toggleDeleteMode());
+        
+        this.deleteBtn = document.getElementById('deleteMode');
+        this.deleteBtn.addEventListener('click', () => this.toggleDeleteMode());
+
         document.getElementById('loadDefault').addEventListener('click', () => this.loadDefaultProfile());
+        
+        // document.getElementById('addCharacter').addEventListener('click', () => this.addNewCharacter());
+        document.getElementById('addCharacter').addEventListener('click', () => {
+            sidebarManager.toggleSidebar();
+        });
 
         document.getElementById('share').addEventListener('click', () => this.shareGrid());
         // document.querySelector('#importProfile input[type="file"]').addEventListener('change', async (e) => {
@@ -259,6 +266,16 @@ class GridManager {
         this.grid.appendChild(cell);
         this.state.layout.push(newChar.id);
         await this.saveState();
+    }
+
+    addCharacterById(charId) {
+        const character = this.characters.find(c => c.id === charId);
+        if (character && !this.state.layout.some(l => l === character.id)) {
+            const cell = this.createCharacterCell(character);
+            this.grid.appendChild(cell);
+            this.state.layout.push(character.id);
+            this.saveState();
+        }
     }
     
     toggleCheckMark(cell) {
@@ -480,6 +497,7 @@ window.onload = () => {
     if (window.location.pathname.startsWith('/share')) {
         new ShareManager(window.gridManager);
     }
+    sidebarManager = new SidebarManager(window.gridManager);
 
     // Add profile loading button handler
     document.getElementById('loadDefault').addEventListener('click', async () => {

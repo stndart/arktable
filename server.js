@@ -26,6 +26,7 @@ app.get('/share/:id', (req, res) => {
 app.use(express.json());
 app.use(cookieParser());
 app.use(express.static('public'));
+app.use('/characters', express.static(path.join(__dirname, 'public/characters')));
 
 // Ensure directories exist
 async function init() {
