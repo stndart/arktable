@@ -16,6 +16,14 @@
         "image":"adel.png"
     },
         {
+        "id":"schwarz",
+        "name":"Schwarz",
+        "class":"Sniper",
+        "subclass":"Sharpshooter",
+        "rarity":6,
+        "image":"schwarz.png"
+    },
+        {
         "id":"gravel",
         "name":"Gravel",
         "class":"Specialist",
