@@ -51,29 +51,44 @@ body {
     width: 100%;
     height: 100%;
     background-image: url('/images/check.png');
-    background-size: cover;
-    pointer-events: none;
-    z-index: 2;
-    opacity: 0.7;
+    background-size: contain;
+    background-repeat: no-repeat;
+    opacity: 1;
+    z-index: 1;
 }
 
 .circles {
-    position: absolute;
-    bottom: 5%;
-    right: 5%;
-    display: flex;
-    gap: 3%;
-    width: 90%;
-    height: 20%;
-    z-index: 3;
+    display: block;
+    z-index: 2;
 }
 
 .circle {
-    flex: 1;
-    background-image: url('/images/circle.png');
-    background-size: contain;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;   /* Stretch circle to fill the container */
+    height: 100%;  /* Stretch circle to fill the container */
+    background-size: contain;  /* Scale the circle image to fit the container */
     background-repeat: no-repeat;
-    opacity: 0.8;
+    opacity: 0;
+    transition: opacity 0.3s; /* Optional smooth transition */
+}
+
+.circle.show {
+    opacity: 1; /* Make the circle visible when the class 'show' is added */
+}
+
+/* Specific background images for each circle (M3.png, M6.png, M9.png) */
+.circle:nth-child(1) {
+    background-image: url('/images/M3.png');
+}
+
+.circle:nth-child(2) {
+    background-image: url('/images/M6.png');
+}
+
+.circle:nth-child(3) {
+    background-image: url('/images/M9.png');
 }
 
 /* Controls */

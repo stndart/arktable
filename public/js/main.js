@@ -111,9 +111,9 @@ class GridManager {
             <div class="check-mark" style="display: none;"></div>
             <img src="/characters/${character.image}" class="character-image">
             <div class="circles">
-                <div class="circle" style="display: none;"></div>
-                <div class="circle" style="display: none;"></div>
-                <div class="circle" style="display: none;"></div>
+                <div class="circle"></div>
+                <div class="circle"></div>
+                <div class="circle"></div>
             </div>
         `;
 
@@ -244,22 +244,26 @@ class GridManager {
         });
     }
 
+    // Add a circle (increase the count)
     addCircle(charId) {
         const circles = this.grid.querySelector(`[data-id="${charId}"] .circles`).children;
         for (let circle of circles) {
-            if (circle.style.display === 'none') {
-                circle.style.display = 'block';
+            console.log(`attempt to add show while op is ${circle.style.opacity} and classlist is ${circle.classList}`);
+            if (!circle.classList.contains('show')) {
+                circle.classList.add('show');
+                console.log("adding show");
                 break;
             }
         }
         this.saveState();
     }
 
+    // Remove a circle (decrease the count)
     removeCircle(charId) {
         const circles = [...this.grid.querySelector(`[data-id="${charId}"] .circles`).children].reverse();
         for (let circle of circles) {
-            if (circle.style.display === 'block') {
-                circle.style.display = 'none';
+            if (circle.classList.contains('show')) {
+                circle.classList.remove('show');
                 break;
             }
         }
@@ -286,8 +290,15 @@ class GridManager {
             const cell = this.grid.querySelector(`[data-id="${id}"]`);
             if (cell) {
                 cell.querySelector('.check-mark').style.display = marks.checks ? 'block' : 'none';
-                cell.querySelectorAll('.circle').forEach((circle, i) => {
-                    circle.style.display = i < marks.circles ? 'block' : 'none';
+
+                // Update circle visibility
+                const circles = cell.querySelectorAll('.circle');
+                circles.forEach((circle, i) => {
+                    if (i < marks.circles) {
+                        circle.classList.add('show');  // Show circle
+                    } else {
+                        circle.classList.remove('show');  // Hide circle
+                    }
                 });
             }
         });
@@ -304,7 +315,9 @@ class GridManager {
             const id = cell.dataset.id;
             state.marks[id] = {
                 checks: cell.querySelector('.check-mark').style.display === 'block',
-                circles: [...cell.querySelectorAll('.circle')].filter(c => c.style.display === 'block').length
+
+                // Count how many circles have the 'show' class (i.e., are visible)
+                circles: [...cell.querySelectorAll('.circle')].filter(c => c.classList.contains('show')).length
             };
         });
 
