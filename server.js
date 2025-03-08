@@ -28,6 +28,21 @@ app.use(cookieParser());
 app.use(express.static('public'));
 app.use('/characters', express.static(path.join(__dirname, 'public/characters')));
 
+const adminAuth = (req, res, next) => {
+    // Check both URL parameter and Authorization header
+    const tokenParam = req.query.token;
+    const authHeader = req.headers.authorization;
+    
+    const validToken = process.env.ADMIN_TOKEN;
+    const token = tokenParam || (authHeader && authHeader.split(' ')[1]);
+    
+    if (token === validToken) {
+        next();
+    } else {
+        res.status(403).json({ error: 'Invalid admin token' });
+    }
+};
+
 // Ensure directories exist
 async function init() {
     await fs.mkdir(DATA_PATH, { recursive: true });
@@ -49,6 +64,100 @@ async function init() {
         }));
     }
 }
+
+// Get all character files with metadata status
+app.get('/admin/files', adminAuth, async (req, res) => {
+    try {
+        const files = await fs.readdir(path.join(__dirname, 'public/characters'));
+        const metadata = require('./public/data/characters.json').characters;
+        
+        const fileData = await Promise.all(files.map(async (file) => {
+            if (!file.endsWith('.png')) return null;
+            
+            const stats = await fs.stat(path.join(__dirname, 'public/characters', file));
+            const existing = metadata.find(c => c.image === file);
+            
+            return {
+                filename: file,
+                indexed: !!existing,
+                size: stats.size,
+                created: stats.birthtime,
+                metadata: existing
+            };
+        }));
+
+        res.json(fileData.filter(Boolean));
+    } catch (error) {
+        res.status(500).json({ error: 'File scan failed' });
+    }
+});
+
+// Update metadata and rename file
+app.post('/admin/update-file', adminAuth, async (req, res) => {
+    const { originalFile, id, name, class: charClass, rarity } = req.body;
+    
+    try {
+        // Validate ID format
+        if (!/^[_a-z0-9\-]+$/.test(id)) {
+            console.log("Error updating file: bad id", id);
+            return res.status(400).json({ error: 'ID must be lowercase alphanumeric' });
+        }
+
+        const newFilename = `${id}.png`;
+        const charactersPath = path.join(__dirname, 'public/characters');
+        
+        // Rename file
+        await fs.rename(
+            path.join(charactersPath, originalFile),
+            path.join(charactersPath, newFilename)
+        );
+
+        // Update metadata
+        const metaPath = path.join(__dirname, 'public/data/characters.json');
+        const data = require(metaPath);
+        
+        const existingIndex = data.characters.findIndex(c => c.image === originalFile);
+        const newCharacter = {
+            id,
+            name,
+            class: charClass,
+            rarity,
+            image: newFilename
+        };
+
+        if (existingIndex > -1) {
+            data.characters[existingIndex] = newCharacter;
+        } else {
+            data.characters.push(newCharacter);
+        }
+
+        await fs.writeFile(metaPath, JSON.stringify(data, null, 2));
+        res.json({ success: true, newFilename });
+    } catch (error) {
+        console.log("Error updating file", error);
+        res.status(500).json({ error: 'File update failed' });
+    }
+});
+
+// Delete file
+app.delete('/admin/delete-file', adminAuth, async (req, res) => {
+    const { filename } = req.body;
+    
+    try {
+        const filePath = path.join(__dirname, 'public/characters', filename);
+        await fs.unlink(filePath);
+        
+        // Remove from metadata
+        const metaPath = path.join(__dirname, 'public/data/characters.json');
+        const data = require(metaPath);
+        data.characters = data.characters.filter(c => c.image !== filename);
+        await fs.writeFile(metaPath, JSON.stringify(data, null, 2));
+        
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'File deletion failed' });
+    }
+});
 
 // API Endpoints
 
@@ -118,7 +227,7 @@ app.post('/admin/add', upload.single('image'), async (req, res) => {
     }
 
     const { name, class: charClass, subclass: charSubclass, rarity } = req.body;
-    const id = name.toLowerCase().replace(/[^a-z]/g, '');
+    const id = name.toLowerCase().replace(/[^a-z0-9 -]/g, '').replace(/ /g, '_');
     const filename = `${id}.png`;
 
     // Read existing data

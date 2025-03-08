@@ -3,9 +3,10 @@
 <head>
     <title>Admin Panel</title>
     <link rel="stylesheet" href="../css/main.css">
+    <link rel="stylesheet" href="../css/admin.css">
 </head>
 <body>
-    <div class="admin-form">
+    <div class="admin-form" style="display: none">
         <h1>Character Management</h1>
         <form id="adminForm">
             <div class="form-group">
@@ -43,6 +44,67 @@
             </div>
             <button type="submit">Upload Character</button>
         </form>
+    </div>
+    <div class="file-manager">
+        <h2>Character Files Management</h2>
+        <div class="file-filters">
+            <button class="filter-btn active" data-filter="all">All</button>
+            <button class="filter-btn" data-filter="indexed">Indexed</button>
+            <button class="filter-btn" data-filter="unindexed">Unindexed</button>
+        </div>
+        <div class="file-grid" id="fileGrid"></div>
+        
+        <!-- Edit Modal -->
+        <div class="modal" id="editModal">
+            <div class="modal-content">
+                <button class="close-btn">&times;</button>
+                <h3>Edit Character Metadata</h3>
+                <form id="metadataForm">
+                    <input type="hidden" id="originalFile">
+                    
+                    <div class="form-group">
+                        <label>ID:</label>
+                        <input type="text" id="charId" required 
+                               pattern="[_a-z0-9\-]+" 
+                               title="Lowercase letters, dashes and undescores only">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Name:</label>
+                        <input type="text" id="charName" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Class:</label>
+                        <select id="charClass" required>
+                            <option value="Caster">Caster</option>
+                            <option value="Defender">Defender</option>
+                            <option value="Guard">Guard</option>
+                            <option value="Medic">Medic</option>
+                            <option value="Sniper">Sniper</option>
+                            <option value="Specialist">Specialist</option>
+                            <option value="Supporter">Supporter</option>
+                            <option value="Vanguard">Vanguard</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Subclass:</label>
+                        <input type="text" id="charSubclass" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Rarity:</label>
+                        <select id="charRarity" required>
+                            <option value="4">4★</option>
+                            <option value="5">5★</option>
+                            <option value="6">6★</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="save-btn">Save Changes</button>
+                </form>
+            </div>
+        </div>
     </div>
     <script src="../js/admin.js"></script>
 </body>

@@ -51,5 +51,194 @@ class AdminManager {
     }
 }
 
+class FileManager {
+    constructor() {
+        this.fileGrid = document.getElementById('fileGrid');
+        this.editModal = document.getElementById('editModal');
+        this.init();
+    }
+
+    async init() {
+        await this.loadFiles();
+        this.setupFilters();
+        this.setupModal();
+    }
+
+    async loadFiles(filter = 'all') {
+        try {
+            const url = new URL('/admin/files', window.location.href);
+            url.searchParams.set('token', new URLSearchParams(window.location.search).get('token'));
+            
+            const response = await fetch(url);
+            let files = await response.json();
+            
+            if (filter !== 'all') {
+                files = files.filter(f => 
+                    filter === 'indexed' ? f.indexed : !f.indexed
+                );
+            }
+
+            this.renderFiles(files);
+        } catch (error) {
+            console.error('Failed to load files:', error);
+        }
+    }
+
+    renderFiles(files) {
+        this.fileGrid.innerHTML = files.map(file => `
+            <div class="file-card ${file.indexed ? '' : 'unindexed'}">
+                <button class="delete-btn" data-file="${file.filename}">&times;</button>
+                <img src="/characters/${file.filename}" 
+                     class="file-preview"
+                     data-file="${file.filename}">
+                <div class="file-info">
+                    ${file.indexed ? `
+                        <div><strong>${file.metadata.name}</strong></div>
+                        <div>${file.metadata.class} • ${file.metadata.rarity}★</div>
+                        <div>${file.metadata.subclass}</div>
+                    ` : '<div class="unindexed-label">Not Indexed</div>'}
+                </div>
+            </div>
+        `).join('');
+    
+        // Update event listeners
+        document.querySelectorAll('.file-preview').forEach(img => {
+            img.addEventListener('click', () => this.showEditModal(img.dataset.file));
+        });
+        
+        document.querySelectorAll('.delete-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.deleteFile(btn.dataset.file);
+            });
+        });
+    }
+
+    async showEditModal(filename) {
+        const url = new URL('/admin/files', window.location.href);
+        url.searchParams.set('token', new URLSearchParams(window.location.search).get('token'));
+        
+        const response = await fetch(url);
+        let files = await response.json();
+        const file = files.find(f => f.filename === filename);
+        
+        const form = document.getElementById('metadataForm');
+        form.reset();
+        
+        document.getElementById('originalFile').value = filename;
+        document.getElementById('charId').value = file?.metadata?.id || 
+            filename.replace(/\.png$/, '').toLowerCase();
+        document.getElementById('charName').value = file?.metadata?.name || '';
+        document.getElementById('charClass').value = file?.metadata?.class || '';
+        document.getElementById('charSubclass').value = file?.metadata?.subclass || '';
+        document.getElementById('charRarity').value = file?.metadata?.rarity?.toString() || '4';
+        
+        this.editModal.style.display = 'block';
+    }
+
+    async deleteFile(filename) {
+        if (!confirm(`Permanently delete ${filename}?`)) return;
+        
+        try {
+            const url = new URL('/admin/delete-file', window.location.href);
+            url.searchParams.set('token', new URLSearchParams(window.location.search).get('token'));
+            await fetch(url, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ filename })
+            });
+            await this.loadFiles();
+        } catch (error) {
+            alert('Delete failed');
+        }
+    }
+
+    setupFilters() {
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.filter-btn').forEach(b => 
+                    b.classList.remove('active'));
+                btn.classList.add('active');
+                this.loadFiles(btn.dataset.filter);
+            });
+        });
+    }
+
+    setupModal() {
+        const closeModal = () => this.editModal.style.display = 'none';
+        
+        document.querySelector('.close-btn').addEventListener('click', closeModal);
+        window.onclick = (e) => e.target === this.editModal && closeModal();
+        
+        this.metadataForm = document.getElementById('metadataForm');
+        this.metadataForm.addEventListener('submit', this.handleSubmit.bind(this));
+        document.querySelector(".save-btn").addEventListener("click", function() {
+            document.getElementById('metadataForm').dispatchEvent(new Event('submit'));
+        }); // cursed
+    }
+
+    async handleSubmit(e) {
+        e.preventDefault();
+        
+        const formData = {
+            originalFile: document.getElementById('originalFile').value,
+            id: document.getElementById('charId').value,
+            name: document.getElementById('charName').value,
+            class: document.getElementById('charClass').value,
+            subclass: document.getElementById('charSubclass').value,
+            rarity: document.getElementById('charRarity').value
+        };
+
+        try {
+            const token = new URLSearchParams(window.location.search).get('token');
+            const response = await fetch('/admin/update-file', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(formData)
+            });
+    
+            if (!response.ok) throw new Error('Update failed');
+            
+            // Close modal and refresh list
+            this.closeModal();
+            await this.loadFiles();
+            this.showSuccessMessage('Changes saved!');
+            
+        } catch (error) {
+            this.showErrorMessage(`Save failed: ${error.message}`);
+            console.error('Submission error:', error);
+        }
+    }
+
+    closeModal() {
+        this.editModal.style.display = 'none';
+        this.metadataForm.reset();
+    }
+    
+    showSuccessMessage(text) {
+        const alert = document.createElement('div');
+        alert.className = 'alert success';
+        alert.textContent = text;
+        document.body.appendChild(alert);
+        setTimeout(() => alert.remove(), 3000);
+    }
+    
+    showErrorMessage(text) {
+        const alert = document.createElement('div');
+        alert.className = 'alert error';
+        alert.textContent = text;
+        document.body.appendChild(alert);
+        setTimeout(() => alert.remove(), 5000);
+    }
+}
+
 // Initialize admin manager
 new AdminManager();
+
+// Initialize after admin auth
+document.addEventListener('DOMContentLoaded', () => {
+    new FileManager();
+});
