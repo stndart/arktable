@@ -53,8 +53,15 @@ class AdminManager {
 
 class FileManager {
     constructor() {
+        // Get token from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        this.adminToken = urlParams.get('token');
+
         this.fileGrid = document.getElementById('fileGrid');
         this.editModal = document.getElementById('editModal');
+        this.contextMenu = this.createContextMenu();
+        document.body.appendChild(this.contextMenu);
+        this.setupContextMenu();
         this.init();
     }
 
@@ -62,6 +69,59 @@ class FileManager {
         await this.loadFiles();
         this.setupFilters();
         this.setupModal();
+    }
+
+    createContextMenu() {
+        const menu = document.createElement('div');
+        menu.className = 'context-menu';
+        menu.innerHTML = `
+            <div class="menu-item" data-action="remove-index">Remove from index</div>
+        `;
+        return menu;
+    }
+
+    setupContextMenu() {
+        document.addEventListener('contextmenu', (e) => {
+            const fileCard = e.target.closest('.file-card');
+            if (fileCard && !fileCard.classList.contains("unindexed")) {
+                e.preventDefault();
+                this.currentFile = fileCard.querySelector('.delete-btn').dataset.file;
+                this.contextMenu.style.display = 'block';
+                this.contextMenu.style.left = `${e.pageX}px`;
+                this.contextMenu.style.top = `${e.pageY}px`;
+            }
+        });
+
+        this.contextMenu.querySelectorAll('.menu-item').forEach(item => {
+            item.addEventListener('click', async () => {
+                const action = item.dataset.action;
+                this.contextMenu.style.display = 'none';
+                
+                if (action === 'remove-index') {
+                    await this.removeIndex();
+                }
+            });
+        });
+
+        document.addEventListener('click', () => {
+            this.contextMenu.style.display = 'none';
+        });
+    }
+
+    async removeIndex() {
+        try {
+            await fetch('/admin/remove-index', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.adminToken}`
+                },
+                body: JSON.stringify({ filename: this.currentFile })
+            });
+            await this.loadFiles();
+        } catch (error) {
+            console.error('Toggle index failed:', error);
+        }
     }
 
     async loadFiles(filter = 'all') {
@@ -177,8 +237,53 @@ class FileManager {
         }); // cursed
     }
 
+    validateForm(form) {
+        let isValid = true;
+        
+        // Required fields
+        const requiredFields = ['charId', 'charName', 'charClass', 'charSubclass', 'charRarity'];
+        requiredFields.forEach(id => {
+            const field = document.getElementById(id);
+            if (!field.value.trim()) {
+                this.showFieldError(field, 'This field is required');
+                isValid = false;
+            } else {
+                this.clearFieldError(field);
+            }
+        });
+    
+        // ID format validation
+        const idField = document.getElementById('charId');
+        if (!/^[_a-z0-9\-]+$/.test(idField.value)) {
+            this.showFieldError(idField, 'Only lowercase letters allowed');
+            isValid = false;
+        }
+    
+        return isValid;
+    }
+
+    showFieldError(field, message) {
+        const errorElement = field.parentElement.querySelector('.error-message') || 
+            document.createElement('div');
+        errorElement.className = 'error-message';
+        errorElement.textContent = message;
+        errorElement.style.color = '#ff4444';
+        errorElement.style.fontSize = '0.8rem';
+        field.parentElement.appendChild(errorElement);
+        field.style.borderColor = '#ff4444';
+    }
+    
+    clearFieldError(field) {
+        const errorElement = field.parentElement.querySelector('.error-message');
+        if (errorElement) errorElement.remove();
+        field.style.borderColor = '#ddd';
+    }
+
     async handleSubmit(e) {
         e.preventDefault();
+        
+        const form = document.getElementById('metadataForm');
+        if (!this.validateForm(form)) return;
         
         const formData = {
             originalFile: document.getElementById('originalFile').value,
@@ -190,12 +295,11 @@ class FileManager {
         };
 
         try {
-            const token = new URLSearchParams(window.location.search).get('token');
             const response = await fetch('/admin/update-file', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
+                    'Authorization': `Bearer ${this.adminToken}`
                 },
                 body: JSON.stringify(formData)
             });

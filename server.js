@@ -94,7 +94,7 @@ app.get('/admin/files', adminAuth, async (req, res) => {
 
 // Update metadata and rename file
 app.post('/admin/update-file', adminAuth, async (req, res) => {
-    const { originalFile, id, name, class: charClass, rarity } = req.body;
+    const { originalFile, id, name, class: charClass, subclass: charSubclass, rarity } = req.body;
     
     try {
         // Validate ID format
@@ -121,6 +121,7 @@ app.post('/admin/update-file', adminAuth, async (req, res) => {
             id,
             name,
             class: charClass,
+            subclass: charSubclass,
             rarity,
             image: newFilename
         };
@@ -262,6 +263,36 @@ app.post('/admin/add', upload.single('image'), async (req, res) => {
     console.log(JSON.stringify(data));
     
     res.json(newChar);
+});
+
+app.post('/admin/remove-index', adminAuth, async (req, res) => {
+    const { filename } = req.body;
+    
+    try {
+        const metaPath = path.join(__dirname, 'public/data/characters.json');
+        const data = require(metaPath);
+        
+        // Toggle existence in metadata
+        const index = data.characters.findIndex(c => c.image === filename);
+        if (index > -1) {
+            data.characters.splice(index, 1);
+        } else {
+            // Add minimal metadata (user can fill details later)
+            data.characters.push({
+                id: filename.replace('.png', ''),
+                name: 'New Character',
+                class: 'Guard',
+                subclass: '',
+                rarity: '4',
+                image: filename
+            });
+        }
+        
+        await fs.writeFile(metaPath, JSON.stringify(data, null, 2));
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Index toggle failed' });
+    }
 });
 
 // Start server

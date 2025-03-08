@@ -1,34 +1,36 @@
 {
-    "characters":[{
-        "id":"wizadel",
-        "name":"Wiz'adel",
-        "class":"Sniper",
-        "subclass":"Flinger",
-        "rarity":6,
-        "image":"wizadel.png"
+  "characters": [
+    {
+      "id": "wizadel",
+      "name": "Wiz'adel",
+      "class": "Sniper",
+      "subclass": "Flinger",
+      "rarity": 6,
+      "image": "wizadel.png"
     },
-        {
-        "id":"adel",
-        "name":"Eyjafjalla",
-        "class":"Caster",
-        "subclass":"Core",
-        "rarity":6,
-        "image":"adel.png"
+    {
+      "id": "adel",
+      "name": "Eyjafjalla",
+      "class": "Caster",
+      "subclass": "Core",
+      "rarity": 6,
+      "image": "adel.png"
     },
-        {
-        "id":"schwarz",
-        "name":"Schwarz",
-        "class":"Sniper",
-        "subclass":"Sharpshooter",
-        "rarity":6,
-        "image":"schwarz.png"
+    {
+      "id": "schwarz",
+      "name": "Schwarz",
+      "class": "Sniper",
+      "subclass": "Sharpshooter",
+      "rarity": 6,
+      "image": "schwarz.png"
     },
-        {
-        "id":"gravel",
-        "name":"Gravel",
-        "class":"Specialist",
-        "subclass":"Executor",
-        "rarity":"4",
-        "image":"gravel.png"
-    }]
+    {
+      "id": "gravel",
+      "name": "Gravel",
+      "class": "Specialist",
+      "subclass": "Executor",
+      "rarity": "4",
+      "image": "gravel.png"
+    }
+  ]
 }
