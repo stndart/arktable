@@ -4,6 +4,7 @@ class GridManager {
         this.isEditable = false;
         this.grid = document.getElementById('characterGrid');
         this.init();
+        this.setupImport();
     }
 
     async init() {
@@ -93,6 +94,81 @@ class GridManager {
         this.grid.querySelectorAll('.character-cell').forEach(cell => {
             cell.draggable = enabled;
         });
+    }
+
+    setupImport() {
+        document.getElementById('importInput').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const btn = document.querySelector('.import-btn');
+            btn.classList.add('loading');
+            
+            try {
+                const data = await this.parseImportFile(file);
+                await this.validateImportData(data);
+                await this.applyImport(data);
+                this.showSuccess('Profile imported successfully!');
+            } catch (error) {
+                this.showError(`Import failed: ${error.message}`);
+            } finally {
+                btn.classList.remove('loading');
+                e.target.value = '';
+            }
+        });
+    }
+    
+    parseImportFile(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    resolve(JSON.parse(e.target.result));
+                } catch (error) {
+                    reject(new Error('Invalid JSON file'));
+                }
+            };
+            reader.onerror = () => reject(new Error('Error reading file'));
+            reader.readAsText(file);
+        });
+    }
+
+    validateImportData(data) {
+        const requiredKeys = ['layout', 'marks'];
+        if (!requiredKeys.every(k => k in data)) {
+            throw new Error('Invalid profile format');
+        }
+        return true;
+    }
+
+    async applyImport(data) {
+        // Save to server
+        await fetch('/api/import', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        });
+        
+        // Reload grid
+        await this.loadState();
+    }
+
+    showSuccess(message) {
+        const alert = document.createElement('div');
+        alert.className = 'alert success';
+        alert.textContent = message;
+        document.body.appendChild(alert);
+        setTimeout(() => alert.remove(), 3000);
+    }
+
+    showError(message) {
+        const alert = document.createElement('div');
+        alert.className = 'alert error';
+        alert.textContent = message;
+        document.body.appendChild(alert);
+        setTimeout(() => alert.remove(), 5000);
     }
 
     handleDragStart(e) {

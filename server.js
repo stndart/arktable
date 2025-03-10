@@ -65,6 +65,161 @@ async function init() {
     }
 }
 
+// API Endpoints
+
+// Get all characters
+app.get('/api/characters', async (req, res) => {
+    try {
+        const data = await fs.readFile(CHAR_DATA_FILE);
+        res.json(JSON.parse(data));
+    } catch (error) {
+        res.status(500).send('Error loading characters');
+        Console.log(error);
+    }
+});
+
+// Save user state
+app.post('/api/save', async (req, res) => {
+    const state = req.body;
+    res.cookie('userState', JSON.stringify(state), { maxAge: 30 * 24 * 60 * 60 * 1000 });
+    res.sendStatus(200);
+});
+
+app.post('/api/share', async (req, res) => {
+    const { state, mode } = req.body;
+    const shareId = crypto.randomBytes(8).toString('hex');
+    const filePath = path.join(SHARED_DIR, `${shareId}.json`);
+    
+    await fs.writeFile(filePath, JSON.stringify({
+        state,
+        mode: mode || 'readwrite',
+        created: new Date().toISOString()
+    }));
+    
+    res.json({ 
+        shareId,
+        readwriteLink: `${process.env.BASE_URL}/share/${shareId}?edit=true`,
+        readonlyLink: `${process.env.BASE_URL}/share/${shareId}`
+    });
+});
+
+app.get('/api/share/:id', async (req, res) => {
+    try {
+        const filePath = path.join(SHARED_DIR, `${req.params.id}.json`);
+        const data = await fs.readFile(filePath);
+        const sharedState = JSON.parse(data);
+        res.json(sharedState);
+    } catch (error) {
+        res.status(404).send('Shared link not found');
+        console.log("404: Share link not found");
+    }
+});
+
+app.post('/api/export', async (req, res) => {
+    const state = req.body;
+    const fileName = `grid-profile-${Date.now()}.json`;
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    res.send(JSON.stringify(state));
+});
+
+app.post('/api/import', async (req, res) => {
+    try {
+        const state = req.body;
+        
+        // Validate structure
+        if (!state.layout || !state.marks) {
+            return res.status(400).json({ error: 'Invalid profile format' });
+        }
+
+        // Save to user state
+        res.cookie('userState', JSON.stringify(state), { 
+            maxAge: 30 * 24 * 60 * 60 * 1000
+        });
+        
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Import failed' });
+    }
+});
+
+// Admin endpoints
+app.post('/admin/add', upload.single('image'), async (req, res) => {
+    console.log("admin add");
+    const token = req.headers.authorization?.split(' ')[1];
+    if (token !== process.env.ADMIN_TOKEN) {
+        console.log("unauthorized")
+        return res.status(403).send('Unauthorized');
+    }
+
+    const { name, class: charClass, subclass: charSubclass, rarity } = req.body;
+    const id = name.toLowerCase().replace(/[^a-z0-9 -]/g, '').replace(/ /g, '_');
+    const filename = `${id}.png`;
+
+    // Read existing data
+    const data = JSON.parse(await fs.readFile(CHAR_DATA_FILE));
+
+    // Check for duplicate id
+    if (data.characters.some(c => c.id === id)) {
+        return res.status(400).json({ error: 'Character with this name already exists' });
+    }
+
+    const newChar = {
+        id,
+        name,
+        class: charClass,
+        subclass: charSubclass,
+        rarity,
+        image: filename
+    };
+
+    // Move and rename uploaded file
+    const finalPath = path.join(__dirname, 'public/characters', newChar.image);
+    await fs.rename(req.file.path, finalPath);
+
+    console.log(req.file.path);
+    console.log(finalPath);
+
+    // Add new character and update metadata
+    data.characters.push(newChar);
+    await fs.writeFile(CHAR_DATA_FILE, JSON.stringify(data, null, 4));
+    
+    console.log(CHAR_DATA_FILE);
+    console.log(JSON.stringify(data));
+    
+    res.json(newChar);
+});
+
+app.post('/admin/remove-index', adminAuth, async (req, res) => {
+    const { filename } = req.body;
+    
+    try {
+        const metaPath = path.join(__dirname, 'public/data/characters.json');
+        const data = require(metaPath);
+        
+        // Toggle existence in metadata
+        const index = data.characters.findIndex(c => c.image === filename);
+        if (index > -1) {
+            data.characters.splice(index, 1);
+        } else {
+            // Add minimal metadata (user can fill details later)
+            data.characters.push({
+                id: filename.replace('.png', ''),
+                name: 'New Character',
+                class: 'Guard',
+                subclass: '',
+                rarity: '4',
+                image: filename
+            });
+        }
+        
+        await fs.writeFile(metaPath, JSON.stringify(data, null, 2));
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Index toggle failed' });
+    }
+});
+
 // Get all character files with metadata status
 app.get('/admin/files', adminAuth, async (req, res) => {
     try {
@@ -157,141 +312,6 @@ app.delete('/admin/delete-file', adminAuth, async (req, res) => {
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'File deletion failed' });
-    }
-});
-
-// API Endpoints
-
-// Get all characters
-app.get('/api/characters', async (req, res) => {
-    try {
-        const data = await fs.readFile(CHAR_DATA_FILE);
-        res.json(JSON.parse(data));
-    } catch (error) {
-        res.status(500).send('Error loading characters');
-        Console.log(error);
-    }
-});
-
-// Save user state
-app.post('/api/save', async (req, res) => {
-    const state = req.body;
-    res.cookie('userState', JSON.stringify(state), { maxAge: 30 * 24 * 60 * 60 * 1000 });
-    res.sendStatus(200);
-});
-
-app.post('/api/share', async (req, res) => {
-    const { state, mode } = req.body;
-    const shareId = crypto.randomBytes(8).toString('hex');
-    const filePath = path.join(SHARED_DIR, `${shareId}.json`);
-    
-    await fs.writeFile(filePath, JSON.stringify({
-        state,
-        mode: mode || 'readwrite',
-        created: new Date().toISOString()
-    }));
-    
-    res.json({ 
-        shareId,
-        readwriteLink: `${process.env.BASE_URL}/share/${shareId}?edit=true`,
-        readonlyLink: `${process.env.BASE_URL}/share/${shareId}`
-    });
-});
-
-app.get('/api/share/:id', async (req, res) => {
-    try {
-        const filePath = path.join(SHARED_DIR, `${req.params.id}.json`);
-        const data = await fs.readFile(filePath);
-        const sharedState = JSON.parse(data);
-        res.json(sharedState);
-    } catch (error) {
-        res.status(404).send('Shared link not found');
-        console.log("404: Share link not found");
-    }
-});
-
-app.post('/api/export', async (req, res) => {
-    const state = req.body;
-    const fileName = `grid-profile-${Date.now()}.json`;
-    res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-    res.send(JSON.stringify(state));
-});
-
-// Admin endpoints
-app.post('/admin/add', upload.single('image'), async (req, res) => {
-    console.log("admin add");
-    const token = req.headers.authorization?.split(' ')[1];
-    if (token !== process.env.ADMIN_TOKEN) {
-        console.log("unauthorized")
-        return res.status(403).send('Unauthorized');
-    }
-
-    const { name, class: charClass, subclass: charSubclass, rarity } = req.body;
-    const id = name.toLowerCase().replace(/[^a-z0-9 -]/g, '').replace(/ /g, '_');
-    const filename = `${id}.png`;
-
-    // Read existing data
-    const data = JSON.parse(await fs.readFile(CHAR_DATA_FILE));
-
-    // Check for duplicate id
-    if (data.characters.some(c => c.id === id)) {
-        return res.status(400).json({ error: 'Character with this name already exists' });
-    }
-
-    const newChar = {
-        id,
-        name,
-        class: charClass,
-        subclass: charSubclass,
-        rarity,
-        image: filename
-    };
-
-    // Move and rename uploaded file
-    const finalPath = path.join(__dirname, 'public/characters', newChar.image);
-    await fs.rename(req.file.path, finalPath);
-
-    console.log(req.file.path);
-    console.log(finalPath);
-
-    // Add new character and update metadata
-    data.characters.push(newChar);
-    await fs.writeFile(CHAR_DATA_FILE, JSON.stringify(data, null, 4));
-    
-    console.log(CHAR_DATA_FILE);
-    console.log(JSON.stringify(data));
-    
-    res.json(newChar);
-});
-
-app.post('/admin/remove-index', adminAuth, async (req, res) => {
-    const { filename } = req.body;
-    
-    try {
-        const metaPath = path.join(__dirname, 'public/data/characters.json');
-        const data = require(metaPath);
-        
-        // Toggle existence in metadata
-        const index = data.characters.findIndex(c => c.image === filename);
-        if (index > -1) {
-            data.characters.splice(index, 1);
-        } else {
-            // Add minimal metadata (user can fill details later)
-            data.characters.push({
-                id: filename.replace('.png', ''),
-                name: 'New Character',
-                class: 'Guard',
-                subclass: '',
-                rarity: '4',
-                image: filename
-            });
-        }
-        
-        await fs.writeFile(metaPath, JSON.stringify(data, null, 2));
-        res.json({ success: true });
-    } catch (error) {
-        res.status(500).json({ error: 'Index toggle failed' });
     }
 });
 
