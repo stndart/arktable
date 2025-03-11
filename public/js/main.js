@@ -1,5 +1,9 @@
 class GridManager {
     constructor() {
+        this.token = localStorage.getItem('jwt');
+        this.isLoggedIn = false;
+        this.userId = null;
+
         this.isSharedPage = window.location.pathname.startsWith('/share/');
         this.isEditable = false;
         this.grid = document.getElementById('characterGrid');
@@ -16,7 +20,7 @@ class GridManager {
 
         this.setupCoreEvents();
         if (!this.isSharedPage) {
-            this.loadInitialState();
+            // this.loadInitialState();
             this.setupControlButtons(); // Setup for regular page
         }
     }
@@ -24,6 +28,44 @@ class GridManager {
     async loadInitialState() {
         await this.loadDefaultProfile();
         this.loadState();
+    }
+
+    async initializeAuth() {
+        if (!this.token) return;
+
+        try {
+            const { valid, userId } = await this.validateToken(this.token);
+            this.isLoggedIn = valid;
+            this.userId = userId;
+
+            if (!valid) {
+                localStorage.removeItem('jwt');
+            }
+        } catch (error) {
+            console.error('Auth validation failed:', error);
+            this.clearAuth();
+        }
+    }
+
+    async validateToken(token) {
+        const response = await fetch('/api/validate-token', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!response.ok) return { valid: false };
+
+        const data = await response.json();
+        return {
+            valid: data.valid,
+            userId: data.userId
+        };
+    }
+
+    clearAuth() {
+        this.token = null;
+        this.isLoggedIn = false;
+        this.userId = null;
+        localStorage.removeItem('jwt');
     }
 
     setupCoreEvents() {
@@ -39,7 +81,7 @@ class GridManager {
 
         // Control Buttons
         if (!this.isSharedPage) { // to avoid overwrite local save
-            document.getElementById('save').addEventListener('click', () => this.saveStateToServer());
+            document.getElementById('save').addEventListener('click', () => this.saveState());
         }
 
         this.deleteBtn = document.getElementById('deleteMode');
@@ -406,6 +448,19 @@ class GridManager {
         this.saveState();
     }
 
+    async loadProfile() {
+        if (this.isLoggedIn) {
+            const response = await fetch('/api/profile', {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            this.state = await response.json();
+            this.applyLayout();
+            this.applyState();
+        } else {
+            this.loadLocalState();
+        }
+    }
+
     applyLayout() {
         // Clear existing grid
         this.grid.innerHTML = '';
@@ -472,7 +527,7 @@ class GridManager {
         });
     }
 
-    async saveState() {
+    getCurrentState() {
         // Collect current state
         const state = {
             layout: [...this.grid.children].map(cell => cell.dataset.id),
@@ -489,37 +544,53 @@ class GridManager {
             };
         });
 
-        this.state = state;
+        return state;
     }
 
-    async saveStateToServer() {
-        // Save to cookie and server
-        await fetch('/api/save', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(this.state)
-        });
-    }
+    async saveState() {
+        const state = this.getCurrentState();
 
-    async shareGrid(mode = 'readwrite') {
-        const state = this.state;
-        try {
-            const response = await fetch('/api/share', {
+        if (this.isLoggedIn) {
+            await fetch('/api/save', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ state, mode })
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.token}`
+                },
+                body: JSON.stringify(state)
             });
-            const { shareId } = await response.json();
-            this.showShareDialog(shareId, mode);
+        }
+        localStorage.setItem('gridState', JSON.stringify(state));
+    }
+
+    async shareGrid() {
+        const state = this.state;
+
+        try {
+            let baseUrl;
+            if (this.isLoggedIn) {
+                baseUrl = `${window.location.origin}/shared/user/${this.userId}`;
+            }
+            else {
+                const response = await fetch('/api/share', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ state })
+                });
+                const { shareId } = await response.json();
+                baseUrl = `${window.location.origin}/shared/${shareId}`;
+            }
+
+            this.showShareDialog(baseUrl);
+
         } catch (error) {
             console.error('Sharing failed:', error);
         }
     }
 
-    showShareDialog(shareId, mode) {
-        const baseUrl = `${window.location.origin}/share/${shareId}`;
-        const readWriteUrl = `${baseUrl}?edit=true`;
-        const readOnlyUrl = `${baseUrl}`;
+    showShareDialog(shareUrl) {
+        const readWriteUrl = `${shareUrl}?edit=true`;
+        const readOnlyUrl = `${shareUrl}`;
 
         const dialog = document.createElement('div');
         dialog.className = 'share-dialog';
@@ -572,8 +643,16 @@ class GridManager {
 }
 
 // Initialize with share manager
-window.onload = () => {
+document.addEventListener('DOMContentLoaded', async () => {
     window.gridManager = new GridManager();
+    await gridManager.initializeAuth(); // Critical auth check
+
+    if (gridManager.isLoggedIn) {
+        await gridManager.loadProfile();
+    } else {
+        await gridManager.loadState();
+    }
+
     if (window.location.pathname.startsWith('/share')) {
         new ShareManager(window.gridManager);
     }
@@ -589,4 +668,4 @@ window.onload = () => {
         await window.gridManager.loadDefaultProfile();
         overlay.remove();
     });
-};
+});

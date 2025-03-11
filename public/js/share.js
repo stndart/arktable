@@ -7,7 +7,7 @@ class ShareManager {
 
     async init() {
         if (!this.shareId) return;
-        
+
         document.getElementById('sharedHeader').style.display = 'block';
         await this.loadSharedState();
         this.setupUiMode();
@@ -17,16 +17,16 @@ class ShareManager {
         try {
             const response = await fetch(`/api/share/${this.shareId}`);
             if (!response.ok) throw new Error('Invalid share link');
-            
+
             const { state, mode } = await response.json();
             await this.gridManager.loadState(state);
-            
+
             const editMode = new URLSearchParams(window.location.search).has('edit');
             this.isEditable = mode === 'readwrite' && editMode;
-            
-            document.getElementById('shareModeInfo').textContent = 
+
+            document.getElementById('shareModeInfo').textContent =
                 `${this.isEditable ? 'Editable' : 'Read-Only'} • Shared ${new Date().toISOString().split('T')[0]}`;
-                
+
         } catch (error) {
             alert('Invalid or expired share link');
             window.location = '/';
@@ -46,5 +46,27 @@ class ShareManager {
             this.gridManager.enableEditMode();
             this.gridManager.setDraggable(true);
         }
+    }
+    showShareDialog() {
+        const isPersistent = gridManager.isLoggedIn;
+        const url = gridManager.getShareLink();
+
+        this.dialog.innerHTML = `
+        <h3>Share Your Grid</h3>
+        <div class="share-type ${isPersistent ? 'persistent' : 'snapshot'}">
+          ${isPersistent ?
+                'Permanent Link' :
+                'Snapshot Link (Expires in 7 days)'}
+        </div>
+        <input type="text" value="${url}" readonly>
+        <button onclick="navigator.clipboard.writeText('${url}')">
+            Copy Link
+        </button>
+        ${isPersistent ? `
+          <div class="notice">
+            This link will always show your latest saved grid
+          </div>
+        ` : ''}
+      `;
     }
 }

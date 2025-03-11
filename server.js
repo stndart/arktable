@@ -21,15 +21,36 @@ const upload = multer({
 const DATA_PATH = path.join(__dirname, 'public/data');
 const CHAR_DATA_FILE = path.join(DATA_PATH, 'characters.json');
 const SHARED_DIR = path.join(DATA_PATH, 'shared');
+const PROFILE_DIR = path.join(DATA_PATH, 'profiles');
 
 const USERS_FILE = 'public/data/users.json';
-const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key';
+const JWT_SECRET = process.env.JWT_SECRET;
+
+const DEFAULT_PROFILE_PATH = path.join(PROFILE_DIR, 'default.json');
+
+if (!JWT_SECRET) {
+    console.error('FATAL: JWT_SECRET not defined!');
+    process.exit(1);
+}
 
 // Middleware
 app.use(express.json());
 app.use(cookieParser());
 app.use(express.static('public'));
 app.use('/characters', express.static(path.join(__dirname, 'public/characters')));
+
+// User storage helper
+async function getUsers() {
+    return JSON.parse(await fs.readFile(USERS_FILE, 'utf8') || '[]');
+}
+
+async function saveUser(user) {
+    const users = await getUsers();
+    users.push(user);
+    await fs.writeFile(USERS_FILE, JSON.stringify(users));
+    const profile_path = path.join(PROFILE_DIR, `${user.id}.json`);
+    await fs.copyFile(DEFAULT_PROFILE_PATH, profile_path);
+}
 
 const adminAuth = (req, res, next) => {
     // Check both URL parameter and Authorization header
@@ -43,6 +64,25 @@ const adminAuth = (req, res, next) => {
         next();
     } else {
         res.status(403).json({ error: 'Invalid admin token' });
+    }
+};
+
+const auth = async (req, res, next) => {
+    try {
+        const token = req.headers.authorization?.split(' ')[1];
+        const decoded = jwt.verify(token, JWT_SECRET);
+
+        // Verify user exists
+        const users = await getUsers();
+        const user = users.find(u => u.id === decoded.userId);
+
+        if (!user) throw new Error('User not found');
+
+        req.user = user;
+        next();
+    } catch (error) {
+        res.status(401).json({ error: 'Unauthorized' });
+        console.log("Unauthorized:", error);
     }
 };
 
@@ -81,42 +121,22 @@ app.get('/api/characters', async (req, res) => {
     }
 });
 
-// Save user state
-app.post('/api/save', async (req, res) => {
-    const state = req.body;
-    // res.cookie('userState', JSON.stringify(state), { maxAge: 30 * 24 * 60 * 60 * 1000 });
-    localStorage.setItem('userState', JSON.stringify(state));
-    res.sendStatus(200);
-});
-
 app.post('/api/share', async (req, res) => {
-    const { state, mode } = req.body;
+    const { state } = req.body;
     const shareId = crypto.randomBytes(8).toString('hex');
     const filePath = path.join(SHARED_DIR, `${shareId}.json`);
 
     await fs.writeFile(filePath, JSON.stringify({
         state,
-        mode: mode || 'readwrite',
+        mode: 'readwrite',
         created: new Date().toISOString()
     }));
 
     res.json({
         shareId,
-        readwriteLink: `${process.env.BASE_URL}/share/${shareId}?edit=true`,
-        readonlyLink: `${process.env.BASE_URL}/share/${shareId}`
+        readwriteLink: `${process.env.BASE_URL}/shared/${shareId}?edit=true`,
+        readonlyLink: `${process.env.BASE_URL}/shared/${shareId}`
     });
-});
-
-app.get('/api/share/:id', async (req, res) => {
-    try {
-        const filePath = path.join(SHARED_DIR, `${req.params.id}.json`);
-        const data = await fs.readFile(filePath);
-        const sharedState = JSON.parse(data);
-        res.json(sharedState);
-    } catch (error) {
-        res.status(404).send('Shared link not found');
-        console.log("404: Share link not found");
-    }
 });
 
 app.post('/api/export', async (req, res) => {
@@ -148,17 +168,6 @@ app.post('/api/import', async (req, res) => {
         console.error("Import error", error);
     }
 });
-
-// User storage helper
-async function getUsers() {
-    return JSON.parse(await fs.readFile(USERS_FILE, 'utf8') || '[]');
-}
-
-async function saveUser(user) {
-    const users = await getUsers();
-    users.push(user);
-    await fs.writeFile(USERS_FILE, JSON.stringify(users));
-}
 
 // User endpoints
 app.post('/api/register', async (req, res) => {
@@ -207,19 +216,73 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-// // Protected endpoints
-// app.get('/api/profile', auth, async (req, res) => {
-//     // Return user's profile data
-// });
+app.get('/api/validate-token', (req, res) => {
+    const token = req.headers.authorization?.split(' ')[1];
 
-// app.post('/api/save', auth, async (req, res) => {
-//     // Save to server storage
-// });
+    if (!token) {
+        return res.status(401).json({ valid: false });
+    }
 
-// // Shared link endpoint
-// app.get('/shared/:userId', async (req, res) => {
-//     // Return latest profile version
-// });
+    jwt.verify(token, JWT_SECRET, (err, decoded) => {
+        if (err) {
+            return res.status(401).json({
+                valid: false,
+                error: err.name === 'TokenExpiredError'
+                    ? 'Token expired'
+                    : 'Invalid token'
+            });
+        }
+
+        res.json({
+            valid: true,
+            userId: decoded.userId,
+            email: decoded.email
+        });
+    });
+});
+
+app.get('/api/profile', auth, async (req, res) => {
+    try {
+        const profilePath = path.join(PROFILE_DIR, `${req.user.id}.json`);
+        const data = await fs.readFile(profilePath);
+        res.json(JSON.parse(data));
+    } catch (error) {
+        res.status(404).json({ error: 'Profile not found' });
+        console.log("Profile not found", error);
+    }
+});
+
+app.post('/api/save', auth, async (req, res) => {
+    try {
+        const profilePath = path.join(PROFILE_DIR, `${req.user.id}.json`);
+        await fs.writeFile(profilePath, JSON.stringify(req.body));
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Save failed' });
+    }
+});
+
+app.get('/shared/:id', async (req, res) => {
+    // Existing anonymous snapshot
+    try {
+        const filePath = path.join(SHARED_DIR, `${req.params.id}.json`);
+        const data = await fs.readFile(filePath);
+        res.json(JSON.parse(data));
+    } catch (error) {
+        res.status(404).send('Shared state not found');
+    }
+});
+
+app.get('/shared/user/:userId', async (req, res) => {
+    // New persistent profile share
+    try {
+        const profilePath = path.join(PROFILE_DIR, `${req.params.userId}.json`);
+        const data = await fs.readFile(profilePath);
+        res.json(JSON.parse(data));
+    } catch (error) {
+        res.status(404).json({ error: 'User profile not found' });
+    }
+});
 
 // Admin endpoints
 app.post('/admin/add', upload.single('image'), async (req, res) => {

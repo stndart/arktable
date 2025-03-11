@@ -14,21 +14,21 @@ class AuthManager {
     initEventListeners() {
         // Show auth modal
         this.loginBtn.addEventListener('click', () => {
-          this.modal.style.display = 'block';
-          this.switchTab('login');
+            this.modal.style.display = 'block';
+            this.switchTab('login');
         });
-    
+
         this.registerBtn.addEventListener('click', () => {
-          this.modal.style.display = 'block';
-          this.switchTab('register');
+            this.modal.style.display = 'block';
+            this.switchTab('register');
         });
-    
+
         // Logout
         this.logoutBtn.addEventListener('click', () => {
-          localStorage.removeItem('jwt');
-          window.location.reload();
+            localStorage.removeItem('jwt');
+            window.location.reload();
         });
-        
+
         // Tab switching
         document.querySelectorAll('.tab').forEach(tab => {
             tab.addEventListener('click', () => this.switchTab(tab.dataset.tab));
