@@ -12,6 +12,7 @@ class GridManager {
             characters: false,
             profile: false
         };
+        this.cellCache = new Map(); // Add this line
 
         this.init_basic();
         this.setupImport();
@@ -271,34 +272,6 @@ class GridManager {
         console.log('GridManager state:', this.state);
     }
 
-    async loadDefaultProfile() {
-        // console.log("Loading default profile.");
-
-        try {
-            // Load data
-            const [profileRes] = await Promise.all([
-                fetch('/default_profile')
-            ]);
-
-            // ensure characters are loaded
-            if (!await this.ensureCharactersLoaded()) {
-                console.error("Interrupting loading default profile.");
-                return; // If characters are not loaded, exit early
-            }
-
-            const profile = await profileRes.json();
-            // console.log("Loaded default layout:", profile.layout);
-
-            this.applyLayout(profile.layout);
-
-            this.state.layout = profile.layout;
-            this.state.marks = profile.marks;
-            this.applyState();
-        } catch (error) {
-            console.error('Error loading profile:', error);
-        }
-    }
-
     async loadCharacters() {
         // console.log("loadCharacters");
         this.loadingState.characters = true;
@@ -475,6 +448,33 @@ class GridManager {
         this.saveState();
     }
 
+    async loadDefaultProfile() {
+        // console.log("Loading default profile.");
+
+        try {
+            // Load data
+            const [profileRes] = await Promise.all([
+                fetch('/default_profile')
+            ]);
+
+            // ensure characters are loaded
+            if (!await this.ensureCharactersLoaded()) {
+                console.error("Interrupting loading default profile.");
+                return; // If characters are not loaded, exit early
+            }
+
+            const profile = await profileRes.json();
+            // console.log("Loaded default layout:", profile.layout);
+
+            this.applyLayout(profile.layout);
+
+            this.state.layout = profile.layout;
+            this.state.marks = profile.marks;
+        } catch (error) {
+            console.error('Error loading default profile:', error);
+        }
+    }
+
     async loadProfile() {
         this.loadingState.profile = true;
 
@@ -485,7 +485,6 @@ class GridManager {
                 });
                 this.state = await response.json();
                 this.applyLayout();
-                this.applyState();
             } finally {
                 this.loadingState.profile = false;
             }
@@ -513,7 +512,6 @@ class GridManager {
         if (state) {
             this.state = state;
             this.applyLayout();
-            this.applyState();
 
             // console.log("state applied");
             // this.logState();
@@ -533,25 +531,35 @@ class GridManager {
         // Then populate with actual data
         requestAnimationFrame(() => {
             this.grid.innerHTML = '';
+
             const uniqueIDs = [...new Set(this.state.layout)];
+            this.cellCache = new Map(); // Track created cells
+
             uniqueIDs.forEach(charId => {
                 if (this.characterMap.has(charId)) {
-                    const cell = this.createCharacterCell(this.characterMap.get(charId));
+                    const character = this.characterMap.get(charId);
+                    const cell = this.createCharacterCell(character);
+                    this.cellCache.set(charId, cell); // Store reference
                     this.grid.appendChild(cell);
                 }
             });
+
+            this.applyState();
         });
     }
 
     applyState() {
-        // Apply check marks and circles
         Object.entries(this.state.marks).forEach(([id, marks]) => {
-            const cell = this.grid.querySelector(`[data-id="${id}"]`);
+            const cell = this.cellCache.get(id); // Use cached cells
+            
             if (cell) {
-                cell.querySelector('.check-mark').style.display = marks.checks ? 'block' : 'none';
-
-                // Update circle visibility
+                const checkMark = cell.querySelector('.check-mark');
                 const circles = cell.querySelectorAll('.circle');
+                
+                // Apply check mark
+                checkMark.style.display = marks.checks ? 'block' : 'none';
+                
+                // Apply circles
                 circles.forEach((circle, i) => {
                     if (i < marks.circles) {
                         circle.classList.add('show');  // Show circle
@@ -686,7 +694,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
         await gridManager.initializeAuth(); // Critical auth check
         await gridManager.initialize();
-    
+
     } catch (error) {
         console.error('Initialization error:', error);
         gridManager.showError('Failed to load data');
