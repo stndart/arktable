@@ -233,7 +233,7 @@ button:hover, .btn:hover {
 
 .destruction-on {
     background: #ff4444 !important;
-    border: 2px solid #cc0000 !important;
+    /* border: 2px solid #cc0000 !important; */
 }
 
 .delete-mode .character-cell {
