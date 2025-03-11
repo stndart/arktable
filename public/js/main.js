@@ -13,7 +13,7 @@ class GridManager {
         await this.loadCharacters();
 
         this.handleDeleteBound = this.handleDelete.bind(this); // Store bound function once
-        
+
         this.setupCoreEvents();
         if (!this.isSharedPage) {
             this.loadInitialState();
@@ -41,12 +41,12 @@ class GridManager {
         if (!this.isSharedPage) { // to avoid overwrite local save
             document.getElementById('save').addEventListener('click', () => this.saveStateToServer());
         }
-        
+
         this.deleteBtn = document.getElementById('deleteMode');
         this.deleteBtn.addEventListener('click', () => this.toggleDeleteMode());
 
         document.getElementById('loadDefault').addEventListener('click', () => this.loadDefaultProfile());
-        
+
         // document.getElementById('addCharacter').addEventListener('click', () => this.addNewCharacter());
         document.getElementById('addCharacter').addEventListener('click', () => {
             sidebarManager.toggleSidebar();
@@ -81,7 +81,7 @@ class GridManager {
                 el.parentNode.replaceChild(clone, el);
             }
         };
-        
+
         ['save', 'addCharacter', 'deleteMode', 'loadDefault'].forEach(cloneElement);
     }
 
@@ -103,7 +103,7 @@ class GridManager {
 
             const btn = document.querySelector('.import-btn');
             btn.classList.add('loading');
-            
+
             try {
                 const data = await this.parseImportFile(file);
                 await this.validateImportData(data);
@@ -117,7 +117,7 @@ class GridManager {
             }
         });
     }
-    
+
     parseImportFile(file) {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -150,7 +150,7 @@ class GridManager {
             },
             body: JSON.stringify(data)
         });
-        
+
         // Reload grid
         await this.loadState();
     }
@@ -209,13 +209,13 @@ class GridManager {
             const [profileRes] = await Promise.all([
                 fetch('/data/profiles/default.json')
             ]);
-            
+
             // ensure characters are loaded
             if (!await this.ensureCharactersLoaded()) {
                 console.error("Interrupting loading default profile.");
                 return; // If characters are not loaded, exit early
             }
-        
+
             const profile = await profileRes.json();
             // console.log("Loaded default layout:", profile.layout);
 
@@ -252,12 +252,12 @@ class GridManager {
             await this.loadCharacters(); // Ensure characters are loaded
             console.log("onload", this.characterMap);
         }
-    
+
         if (!this.characters || this.characters.length === 0 || !this.characterMap) {
             console.error("Characters could not be loaded.");
             return false; // Return false to signal failure
         }
-    
+
         return true; // Return true if characters are loaded
     }
 
@@ -286,7 +286,7 @@ class GridManager {
         const isActive = this.deleteBtn.classList.toggle('destruction-on');
         this.grid.classList.toggle('delete-mode', isActive);
         this.deleteBtn.textContent = isActive ? 'Cancel Delete' : 'Delete Mode';
-    
+
         // Add or remove click handler depending on the state
         if (isActive) {
             this.grid.addEventListener('click', this.handleDeleteBound);
@@ -294,7 +294,7 @@ class GridManager {
             this.grid.removeEventListener('click', this.handleDeleteBound);
         }
     }
-    
+
     handleDelete(e) {
         const cell = e.target.closest('.character-cell');
         if (cell) {
@@ -307,14 +307,14 @@ class GridManager {
         const cell = e.target.closest('.character-cell');
         if (cell) this.toggleCheckMark(cell);
     }
-    
+
     getDragAfterElement(horizontalPosition) {
         const draggableElements = [...this.grid.querySelectorAll('.character-cell:not(.dragging)')];
-        
+
         return draggableElements.reduce((closest, child) => {
             const box = child.getBoundingClientRect();
             const offset = horizontalPosition - box.left - box.width / 2;
-            
+
             if (offset < 0 && offset > closest.offset) {
                 return { offset: offset, element: child };
             } else {
@@ -328,16 +328,16 @@ class GridManager {
         const availableCharacters = this.characters.filter(c =>
             !this.state.layout.some(l => l === c.id)
         );
-    
+
         if (availableCharacters.length === 0) {
             console.warn("No available characters to add");
             return;
         }
-    
+
         // Pick random character
         const randomIndex = Math.floor(Math.random() * availableCharacters.length);
         const newChar = availableCharacters[randomIndex];
-    
+
         const cell = this.createCharacterCell(newChar);
         this.grid.appendChild(cell);
         this.state.layout.push(newChar.id);
@@ -353,7 +353,7 @@ class GridManager {
             this.saveState();
         }
     }
-    
+
     toggleCheckMark(cell) {
         const checkMark = cell.querySelector('.check-mark');
         checkMark.style.display = checkMark.style.display === 'none' ? 'block' : 'none';
@@ -363,19 +363,19 @@ class GridManager {
     showContextMenu(cell, x, y) {
         // Remove existing menus
         document.querySelectorAll('.context-menu').forEach(menu => menu.remove());
-        
+
         const menu = document.createElement('div');
         menu.className = 'context-menu';
         menu.style.left = `${x}px`;
         menu.style.top = `${y}px`;
-        
+
         menu.innerHTML = `
             <div class="context-item" onclick="gridManager.addCircle('${cell.dataset.id}')">Add Circle</div>
             <div class="context-item" onclick="gridManager.removeCircle('${cell.dataset.id}')">Remove Circle</div>
         `;
-        
+
         document.body.appendChild(menu);
-        
+
         // Close menu on click outside
         setTimeout(() => {
             document.addEventListener('click', () => menu.remove(), { once: true });
@@ -409,7 +409,7 @@ class GridManager {
     applyLayout() {
         // Clear existing grid
         this.grid.innerHTML = '';
-        
+
         // Add unique characters in order
         const uniqueIDs = [...new Set(this.state.layout)];
         uniqueIDs.forEach(charId => {
@@ -427,14 +427,18 @@ class GridManager {
             console.log("Loading state from share id.");
             state = externalState;
         } else {
-            console.log("Loading state from cookies.");
+            console.log("Loading state from localStorage.");
 
-            const cookieState = document.cookie.match(/userState=([^;]+)/);
-            if (cookieState) {
-                state = JSON.parse(decodeURIComponent(cookieState[1]));
+            // const cookieState = document.cookie.match(/userState=([^;]+)/);
+            // if (cookieState) {
+            //     state = JSON.parse(decodeURIComponent(cookieState[1]));
+            // }
+            const localStorageState = localStorage.getItem('userState');
+            if (localStorageState) {
+                state = JSON.parse(localStorageState);
             }
         }
-        
+
         if (state) {
             this.state = state;
             this.applyLayout();
@@ -445,7 +449,7 @@ class GridManager {
         else {
             console.error("Empty state.")
         }
-        
+
     }
 
     applyState() {
@@ -496,7 +500,7 @@ class GridManager {
             body: JSON.stringify(this.state)
         });
     }
-    
+
     async shareGrid(mode = 'readwrite') {
         const state = this.state;
         try {
@@ -516,7 +520,7 @@ class GridManager {
         const baseUrl = `${window.location.origin}/share/${shareId}`;
         const readWriteUrl = `${baseUrl}?edit=true`;
         const readOnlyUrl = `${baseUrl}`;
-        
+
         const dialog = document.createElement('div');
         dialog.className = 'share-dialog';
         dialog.innerHTML = `
@@ -581,7 +585,7 @@ window.onload = () => {
         overlay.className = 'loading-overlay';
         overlay.textContent = 'Loading Default Profile...';
         document.body.appendChild(overlay);
-    
+
         await window.gridManager.loadDefaultProfile();
         overlay.remove();
     });

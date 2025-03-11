@@ -7,8 +7,12 @@ const cookieParser = require('cookie-parser');
 const { Console } = require('console');
 const crypto = require('crypto');
 
+const createHash = crypto.createHash;
+const jwt = require('jsonwebtoken');
+const uuidv4 = require('uuid').v4;
+
 const app = express();
-const upload = multer({ 
+const upload = multer({
     dest: 'public/characters/temp/',
     limits: { fileSize: 500000 } // 500KB
 });
@@ -18,9 +22,8 @@ const DATA_PATH = path.join(__dirname, 'public/data');
 const CHAR_DATA_FILE = path.join(DATA_PATH, 'characters.json');
 const SHARED_DIR = path.join(DATA_PATH, 'shared');
 
-app.get('/share/:id', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public/index.html'));
-});
+const USERS_FILE = 'public/data/users.json';
+const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key';
 
 // Middleware
 app.use(express.json());
@@ -32,10 +35,10 @@ const adminAuth = (req, res, next) => {
     // Check both URL parameter and Authorization header
     const tokenParam = req.query.token;
     const authHeader = req.headers.authorization;
-    
+
     const validToken = process.env.ADMIN_TOKEN;
     const token = tokenParam || (authHeader && authHeader.split(' ')[1]);
-    
+
     if (token === validToken) {
         next();
     } else {
@@ -50,7 +53,7 @@ async function init() {
     if (!await fileExists(CHAR_DATA_FILE)) {
         await fs.writeFile(CHAR_DATA_FILE, JSON.stringify({ characters: [] }));
     }
-    
+
     // Create default profile if missing
     const PROFILE_FILE = path.join(DATA_PATH, 'profiles/default.json');
     if (!await fileExists(PROFILE_FILE)) {
@@ -81,7 +84,8 @@ app.get('/api/characters', async (req, res) => {
 // Save user state
 app.post('/api/save', async (req, res) => {
     const state = req.body;
-    res.cookie('userState', JSON.stringify(state), { maxAge: 30 * 24 * 60 * 60 * 1000 });
+    // res.cookie('userState', JSON.stringify(state), { maxAge: 30 * 24 * 60 * 60 * 1000 });
+    localStorage.setItem('userState', JSON.stringify(state));
     res.sendStatus(200);
 });
 
@@ -89,14 +93,14 @@ app.post('/api/share', async (req, res) => {
     const { state, mode } = req.body;
     const shareId = crypto.randomBytes(8).toString('hex');
     const filePath = path.join(SHARED_DIR, `${shareId}.json`);
-    
+
     await fs.writeFile(filePath, JSON.stringify({
         state,
         mode: mode || 'readwrite',
         created: new Date().toISOString()
     }));
-    
-    res.json({ 
+
+    res.json({
         shareId,
         readwriteLink: `${process.env.BASE_URL}/share/${shareId}?edit=true`,
         readonlyLink: `${process.env.BASE_URL}/share/${shareId}`
@@ -126,22 +130,96 @@ app.post('/api/export', async (req, res) => {
 app.post('/api/import', async (req, res) => {
     try {
         const state = req.body;
-        
+
         // Validate structure
         if (!state.layout || !state.marks) {
             return res.status(400).json({ error: 'Invalid profile format' });
         }
 
         // Save to user state
-        res.cookie('userState', JSON.stringify(state), { 
-            maxAge: 30 * 24 * 60 * 60 * 1000
-        });
-        
+        // res.cookie('userState', JSON.stringify(state), { 
+        //     maxAge: 30 * 24 * 60 * 60 * 1000
+        // });
+        localStorage.setItem('userState', JSON.stringify(state));
+
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'Import failed' });
+        console.error("Import error", error);
     }
 });
+
+// User storage helper
+async function getUsers() {
+    return JSON.parse(await fs.readFile(USERS_FILE, 'utf8') || '[]');
+}
+
+async function saveUser(user) {
+    const users = await getUsers();
+    users.push(user);
+    await fs.writeFile(USERS_FILE, JSON.stringify(users));
+}
+
+// User endpoints
+app.post('/api/register', async (req, res) => {
+    try {
+        const { email, password } = req.body;
+        const users = await getUsers();
+
+        if (users.some(u => u.email === email)) {
+            return res.status(400).json({ error: 'Email already exists' });
+        }
+
+        const user = {
+            id: uuidv4(),
+            email,
+            password: createHash('sha256').update(password).digest('hex'),
+            createdAt: new Date().toISOString()
+        };
+
+        await saveUser(user);
+
+        const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
+        res.json({ token });
+
+    } catch (error) {
+        res.status(500).json({ error: 'Registration failed' });
+        console.error("Registration failed", error);
+    }
+});
+
+app.post('/api/login', async (req, res) => {
+    try {
+        const { email, password } = req.body;
+        const users = await getUsers();
+        const user = users.find(u => u.email === email);
+
+        if (!user || user.password !== createHash('sha256').update(password).digest('hex')) {
+            return res.status(401).json({ error: 'Invalid credentials' });
+        }
+
+        const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
+        res.json({ token });
+
+    } catch (error) {
+        res.status(500).json({ error: 'Login failed' });
+        console.error("Login failed", error);
+    }
+});
+
+// // Protected endpoints
+// app.get('/api/profile', auth, async (req, res) => {
+//     // Return user's profile data
+// });
+
+// app.post('/api/save', auth, async (req, res) => {
+//     // Save to server storage
+// });
+
+// // Shared link endpoint
+// app.get('/shared/:userId', async (req, res) => {
+//     // Return latest profile version
+// });
 
 // Admin endpoints
 app.post('/admin/add', upload.single('image'), async (req, res) => {
@@ -183,20 +261,20 @@ app.post('/admin/add', upload.single('image'), async (req, res) => {
     // Add new character and update metadata
     data.characters.push(newChar);
     await fs.writeFile(CHAR_DATA_FILE, JSON.stringify(data, null, 4));
-    
+
     console.log(CHAR_DATA_FILE);
     console.log(JSON.stringify(data));
-    
+
     res.json(newChar);
 });
 
 app.post('/admin/remove-index', adminAuth, async (req, res) => {
     const { filename } = req.body;
-    
+
     try {
         const metaPath = path.join(__dirname, 'public/data/characters.json');
         const data = require(metaPath);
-        
+
         // Toggle existence in metadata
         const index = data.characters.findIndex(c => c.image === filename);
         if (index > -1) {
@@ -212,7 +290,7 @@ app.post('/admin/remove-index', adminAuth, async (req, res) => {
                 image: filename
             });
         }
-        
+
         await fs.writeFile(metaPath, JSON.stringify(data, null, 2));
         res.json({ success: true });
     } catch (error) {
@@ -225,13 +303,13 @@ app.get('/admin/files', adminAuth, async (req, res) => {
     try {
         const files = await fs.readdir(path.join(__dirname, 'public/characters'));
         const metadata = require('./public/data/characters.json').characters;
-        
+
         const fileData = await Promise.all(files.map(async (file) => {
             if (!file.endsWith('.png')) return null;
-            
+
             const stats = await fs.stat(path.join(__dirname, 'public/characters', file));
             const existing = metadata.find(c => c.image === file);
-            
+
             return {
                 filename: file,
                 indexed: !!existing,
@@ -250,7 +328,7 @@ app.get('/admin/files', adminAuth, async (req, res) => {
 // Update metadata and rename file
 app.post('/admin/update-file', adminAuth, async (req, res) => {
     const { originalFile, id, name, class: charClass, subclass: charSubclass, rarity } = req.body;
-    
+
     try {
         // Validate ID format
         if (!/^[_a-z0-9\-]+$/.test(id)) {
@@ -260,7 +338,7 @@ app.post('/admin/update-file', adminAuth, async (req, res) => {
 
         const newFilename = `${id}.png`;
         const charactersPath = path.join(__dirname, 'public/characters');
-        
+
         // Rename file
         await fs.rename(
             path.join(charactersPath, originalFile),
@@ -270,7 +348,7 @@ app.post('/admin/update-file', adminAuth, async (req, res) => {
         // Update metadata
         const metaPath = path.join(__dirname, 'public/data/characters.json');
         const data = require(metaPath);
-        
+
         const existingIndex = data.characters.findIndex(c => c.image === originalFile);
         const newCharacter = {
             id,
@@ -298,17 +376,17 @@ app.post('/admin/update-file', adminAuth, async (req, res) => {
 // Delete file
 app.delete('/admin/delete-file', adminAuth, async (req, res) => {
     const { filename } = req.body;
-    
+
     try {
         const filePath = path.join(__dirname, 'public/characters', filename);
         await fs.unlink(filePath);
-        
+
         // Remove from metadata
         const metaPath = path.join(__dirname, 'public/data/characters.json');
         const data = require(metaPath);
         data.characters = data.characters.filter(c => c.image !== filename);
         await fs.writeFile(metaPath, JSON.stringify(data, null, 2));
-        
+
         res.json({ success: true });
     } catch (error) {
         res.status(500).json({ error: 'File deletion failed' });
