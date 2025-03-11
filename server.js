@@ -19,9 +19,12 @@ const upload = multer({
 
 // Configuration
 const DATA_PATH = path.join(__dirname, '/data');
-const CHAR_DATA_FILE = 'public/data/characters.json';
 const SHARED_DIR = path.join(DATA_PATH, 'shared');
 const PROFILE_DIR = path.join(DATA_PATH, 'profiles');
+
+const CHAR_DATA_FILE = './public/data/characters.json';
+const charData = require(CHAR_DATA_FILE);
+const validCharIds = new Set(charData.characters.map(char => char.id));
 
 const USERS_FILE = path.join(DATA_PATH, 'users.json');
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -122,46 +125,56 @@ app.get('/api/characters', async (req, res) => {
     }
 });
 
-app.post('/api/share', async (req, res) => {
-    const { state } = req.body;
-    const shareId = crypto.randomBytes(8).toString('hex');
-    const filePath = path.join(SHARED_DIR, `${shareId}.json`);
-
-    await fs.writeFile(filePath, JSON.stringify({
-        state,
-        mode: 'readwrite',
-        created: new Date().toISOString()
-    }));
-
-    res.json({
-        shareId,
-        readwriteLink: `${process.env.BASE_URL}/shared/${shareId}?edit=true`,
-        readonlyLink: `${process.env.BASE_URL}/shared/${shareId}`
-    });
-});
-
-app.post('/api/export', async (req, res) => {
-    const state = req.body;
-    const fileName = `grid-profile-${Date.now()}.json`;
-    res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-    res.send(JSON.stringify(state));
-});
-
 app.post('/api/import', async (req, res) => {
     try {
-        const state = req.body;
+        const { layout, marks } = req.body;
 
-        // Validate structure
-        if (!state.layout || !state.marks) {
-            return res.status(400).json({ error: 'Invalid profile format' });
+        // Validate layout structure
+        if (!Array.isArray(layout)) {
+            return res.status(400).json({ error: 'Invalid layout format' });
         }
 
-        // Save to user state
-        // res.cookie('userState', JSON.stringify(state), { 
-        //     maxAge: 30 * 24 * 60 * 60 * 1000
-        // });
-        localStorage.setItem('userState', JSON.stringify(state));
+        // Validate character IDs
+        const validLayoutFormat = layout.every(id =>
+            typeof id === 'string' &&
+            /^[a-z0-9_-]+$/.test(id)
+        );
+        if (!validLayoutFormat) {
+            return res.status(400).json({ error: 'Invalid character IDs' });
+        }
+
+        // Validate that every layout id exists in our character data
+        const allLayoutIdsValid = layout.every(id => validCharIds.has(id));
+        if (!allLayoutIdsValid) {
+            return res.status(400).json({ error: 'Some layout character IDs do not exist' });
+        }
+
+        // Validate marks structure
+        if (!marks || typeof marks !== 'object' || Array.isArray(marks)) {
+            return res.status(400).json({ error: 'Invalid marks format' });
+        }
+
+        // Validate each mark entry:
+        // Each key should correspond to a valid character id,
+        // and each value must be an object with a boolean "checks" and a number "circles" (0-3)
+        for (const [id, mark] of Object.entries(marks)) {
+            // Check if the mark's id exists in the character data
+            if (!validCharIds.has(id)) {
+                return res.status(400).json({ error: `Character ID "${id}" in marks does not exist` });
+            }
+
+            if (typeof mark !== 'object' || mark === null) {
+                return res.status(400).json({ error: `Invalid mark entry for character "${id}"` });
+            }
+
+            if (typeof mark.checks !== 'boolean') {
+                return res.status(400).json({ error: `Invalid "checks" value for character "${id}"` });
+            }
+
+            if (typeof mark.circles !== 'number' || mark.circles < 0 || mark.circles > 3) {
+                return res.status(400).json({ error: `Invalid "circles" value for character "${id}"` });
+            }
+        }
 
         res.json({ success: true });
     } catch (error) {
@@ -264,7 +277,31 @@ app.post('/api/save', auth, async (req, res) => {
     }
 });
 
-app.get('/shared/:id', async (req, res) => {
+// Save shared snapshot
+app.post('/api/save-shared', async (req, res) => {
+    const shareId = uuidv4();
+    const filePath = path.join(SHARED_DIR, `${shareId}.json`);
+    
+    await fs.writeFile(filePath, JSON.stringify(req.body));
+    res.json({ shareId });
+});
+
+app.post('/api/share', async (req, res) => {
+    const shareId = uuidv4();
+    const filePath = path.join(SHARED_DIR, `${shareId}.json`);
+
+    await fs.writeFile(filePath, JSON.stringify({
+        ...req.body,
+        meta: {
+            created: new Date().toISOString(),
+            parent: req.query.edit ? req.params.id : null
+        }
+    }));
+    
+    res.json({ shareId });
+});
+
+app.get('/api/shared/:id', async (req, res) => {
     // Existing anonymous snapshot
     try {
         const filePath = path.join(SHARED_DIR, `${req.params.id}.json`);
@@ -275,7 +312,7 @@ app.get('/shared/:id', async (req, res) => {
     }
 });
 
-app.get('/shared/user/:userId', async (req, res) => {
+app.get('/api/shared/user/:userId', async (req, res) => {
     // New persistent profile share
     try {
         const profilePath = path.join(PROFILE_DIR, `${req.params.userId}.json`);
@@ -284,6 +321,14 @@ app.get('/shared/user/:userId', async (req, res) => {
     } catch (error) {
         res.status(404).json({ error: 'User profile not found' });
     }
+});
+
+app.get('/shared/:id', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public/index.html'));
+});
+
+app.get('/shared/user/:userId', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public/index.html'));
 });
 
 // Admin endpoints

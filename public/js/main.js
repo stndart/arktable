@@ -4,8 +4,12 @@ class GridManager {
         this.isLoggedIn = false;
         this.userId = null;
 
-        this.isSharedPage = window.location.pathname.startsWith('/share/');
-        this.isEditable = false;
+        this.isSharedPage = window.location.pathname.startsWith('/shared/');
+        this.isPersistentShare = window.location.pathname.startsWith('/shared/user/');
+        this.shareId = this.getShareIdFromURL();
+        this.isEditable = !this.isSharedPage;
+        console.log("is editable?", this.isEditable);
+
         this.grid = document.getElementById('characterGrid');
 
         this.loadingState = {
@@ -13,6 +17,13 @@ class GridManager {
             profile: false
         };
         this.cellCache = new Map(); // Add this line
+
+        this.shareManager = new ShareManager(this);
+
+        // Bind share button click
+        document.getElementById('share').addEventListener('click', () => {
+            this.shareManager.show();
+        });
 
         this.init_basic();
         this.setupImport();
@@ -24,13 +35,24 @@ class GridManager {
 
         this.handleDeleteBound = this.handleDelete.bind(this); // Store bound function once
 
-        this.setupCoreEvents();
+        if (this.isEditable) {
+            this.setupCoreEvents();
+        }
         if (!this.isSharedPage) {
             this.setupControlButtons(); // Setup for regular page
         }
     }
 
     async initialize() {
+        console.log('initialize with shared?', this.isSharedPage);
+        if (this.isSharedPage) {
+            await this.loadSharedData();
+        } else {
+            await this.loadUserData();
+        }
+    }
+
+    async loadUserData() {
         this.showLoading(true);
 
         try {
@@ -45,19 +67,43 @@ class GridManager {
             }
 
         } catch (error) {
-            console.error('Initialization failed:', error);
+            console.error('loadUserData failed:', error);
         } finally {
             this.showLoading(false);
         }
     }
 
-    showLoading(show) {
-        document.getElementById('loadingOverlay').style.display = show ? 'flex' : 'none';
+    async loadSharedData() {
+        console.log("loading shared data");
+
+        const endpoint = this.isPersistentShare
+            ? `/api/shared/user/${this.shareId}`
+            : `/api/shared/${this.shareId}`;
+
+        try {
+            const response = await fetch(endpoint);
+            this.state = await response.json();
+            await this.loadCharacters();
+            this.applyLayout();
+        } catch (error) {
+            console.error('Failed to load shared data:', error);
+            this.showError(
+                this.isPersistentShare
+                    ? 'Could not load persistent grid'
+                    : 'Shared snapshot expired or invalid'
+            );
+            setTimeout(() => window.location = '/', 3000);
+        }
     }
 
-    async loadInitialState() {
-        await this.loadDefaultProfile();
-        this.loadState();
+    getShareIdFromURL() {
+        const pathParts = window.location.pathname.split('/');
+        if (this.isPersistentShare) return pathParts[3]; // user ID
+        return pathParts[2]; // snapshot ID
+    }
+
+    showLoading(show) {
+        document.getElementById('loadingOverlay').style.display = show ? 'flex' : 'none';
     }
 
     async initializeAuth() {
@@ -123,14 +169,7 @@ class GridManager {
             sidebarManager.toggleSidebar();
         });
 
-        document.getElementById('share').addEventListener('click', () => this.shareGrid());
-        // document.querySelector('#importProfile input[type="file"]').addEventListener('change', async (e) => {
-        //     const file = e.target.files[0];
-        //     if (file) {
-        //         await this.importFromFile(file);
-        //         e.target.value = ''; // Reset input
-        //     }
-        // });
+        // document.getElementById('share').addEventListener('click', () => this.shareGrid());
 
         // Check marks
         this.grid.addEventListener('click', this.handleToggle.bind(this));
@@ -158,6 +197,7 @@ class GridManager {
 
     enableEditMode() {
         this.isEditable = true;
+        console.log("is editable now?", this.isEditable);
         this.setupControlButtons();
     }
 
@@ -214,7 +254,7 @@ class GridManager {
 
     async applyImport(data) {
         // Save to server
-        await fetch('/api/import', {
+        const response = await fetch('/api/import', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -222,8 +262,10 @@ class GridManager {
             body: JSON.stringify(data)
         });
 
-        // Reload grid
-        await this.loadState();
+        // Reload grid after confirmation
+        if (response.ok) {
+            await this.loadState();
+        }
     }
 
     showSuccess(message) {
@@ -476,22 +518,21 @@ class GridManager {
     }
 
     async loadProfile() {
+        if (!this.isLoggedIn)
+            throw new Error("Shouldn't have called loadProfile while not logged in!");
+
         this.loadingState.profile = true;
 
-        if (this.isLoggedIn) {
-            try {
-                const response = await fetch('/api/profile', {
-                    headers: { 'Authorization': `Bearer ${this.token}` }
-                });
-                this.state = await response.json();
-                this.applyLayout();
-            } finally {
-                this.loadingState.profile = false;
-            }
-
-        } else {
-            this.loadState();
+        try {
+            const response = await fetch('/api/profile', {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            this.state = await response.json();
+            this.applyLayout();
+        } finally {
+            this.loadingState.profile = false;
         }
+
     }
 
     async loadState(externalState) {
@@ -551,14 +592,14 @@ class GridManager {
     applyState() {
         Object.entries(this.state.marks).forEach(([id, marks]) => {
             const cell = this.cellCache.get(id); // Use cached cells
-            
+
             if (cell) {
                 const checkMark = cell.querySelector('.check-mark');
                 const circles = cell.querySelectorAll('.circle');
-                
+
                 // Apply check mark
                 checkMark.style.display = marks.checks ? 'block' : 'none';
-                
+
                 // Apply circles
                 circles.forEach((circle, i) => {
                     if (i < marks.circles) {
@@ -593,22 +634,79 @@ class GridManager {
 
     async saveState() {
         const state = this.getCurrentState();
-        // console.log("save state")
+        console.log("save state, shared?", this.isSharedPage, "logged in?", this.isLoggedIn);
 
-        if (this.isLoggedIn) {
-            await fetch('/api/save', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${this.token}`
-                },
-                body: JSON.stringify(state)
-            });
+        // For shared pages in edit mode
+        if (this.isSharedPage && this.isEditable) {
+            return this.saveSharedState(state);
         }
-        localStorage.setItem('gridState', JSON.stringify(state));
+
+        // Regular save flow
+        if (!this.isSharedPage) {
+            if (this.isLoggedIn) {
+                await this.saveToServer(state);
+            }
+            localStorage.setItem('gridState', JSON.stringify(state));
+            console.log("Saved to local storage");
+        }
+    }
+
+    async saveToServer(state) {
+        const endpoint = (this.isSharedPage && !this.isPersistentShare)
+            ? '/api/save-shared'
+            : '/api/save';
+
+        console.log("saving to server", endpoint, state);
+
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${this.token}`
+            },
+            body: JSON.stringify(state)
+        });
+
+        if (!response.ok) throw new Error('Save failed');
+    }
+
+    async saveSharedState(state) {
+        if (this.isPersistentShare) {
+            // Save to original user's profile
+            await this.saveToServer(state);
+        } else {
+            // Create new snapshot and update URL
+            const { shareId } = await this.createSnapshot(state);
+            this.updateSharedUrl(shareId);
+        }
+    }
+
+    async createSnapshot(state) {
+        const response = await fetch('/api/share', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(state)
+        });
+        return response.json();
+    }
+
+    async shareSnapshot(state, editable) {
+        const { shareId } = await this.createSnapshot(state);
+        return `${window.location.origin}/shared/${shareId}${editable ? '?edit=true' : ''}`;
+    }
+
+    async sharePersistent(editable) {
+        return `${window.location.origin}/shared/user/${this.userId}${editable ? '?edit=true' : ''}`;
+    }
+
+    updateSharedUrl(newShareId) {
+        const newUrl = `/shared/${newShareId}${this.isEditable ? '?edit=true' : ''}`;
+        window.history.replaceState({}, '', newUrl);
+        this.shareId = newShareId;
     }
 
     async shareGrid() {
+        console.log("share button pressed");
         const state = this.state;
 
         try {
@@ -698,16 +796,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (error) {
         console.error('Initialization error:', error);
         gridManager.showError('Failed to load data');
-    }
-
-    if (gridManager.isLoggedIn) {
-        await gridManager.loadProfile();
-    } else {
-        await gridManager.loadState();
-    }
-
-    if (window.location.pathname.startsWith('/share')) {
-        new ShareManager(window.gridManager);
     }
     sidebarManager = new SidebarManager(window.gridManager);
 

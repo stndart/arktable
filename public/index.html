@@ -7,6 +7,7 @@
     <title>Character Grid Manager</title>
     <link rel="stylesheet" href="/css/main.css">
     <link rel="stylesheet" href="/css/auth.css">
+    <link rel="stylesheet" href="/css/share.css">
 </head>
 
 <body>
@@ -36,8 +37,9 @@
     </div>
 
     <div id="sharedHeader" style="display: none;">
-        <h2>Shared Grid View</h2>
+        <h2 id="shareStatus"></h2>
         <p id="shareModeInfo"></p>
+        <button onclick="window.location.href='/'">Back to My Grid</button>
     </div>
 
     <div class="auth-controls">
@@ -52,12 +54,6 @@
     <div class="controls">
         <button id="save" title="Save current layout">Save Layout</button>
         <button id="share" title="Share current layout">Share</button>
-        <!-- <div class="import-wrapper">
-            <button class="import-btn" id="importTrigger">
-                Import Profile
-            </button>
-            <input type="file" id="importInput" accept=".json" hidden>
-        </div> -->
         <label class="btn import-btn">
             <input type="file" id="importInput" accept=".json" hidden>
             <!-- <span class="btn-content"> -->
@@ -86,6 +82,23 @@
         </div>
         <div class="sidebar-grid" id="sidebarGrid"></div>
     </div>
+
+    <div class="share-modal" id="shareModal">
+        <div class="share-dialog">
+          <div class="share-header">
+            <h3>Share grid</h3>
+            <button class="close-btn">&times;</button>
+          </div>
+          
+          <div class="share-options">
+            <!-- Options will be dynamically populated -->
+          </div>
+      
+          <div class="share-footer">
+            <div class="link-preview" id="shareLinkPreview"></div>
+          </div>
+        </div>
+      </div>
 
     <!-- Context Menu Template -->
     <div class="context-menu" id="contextMenu" style="display: none;">
