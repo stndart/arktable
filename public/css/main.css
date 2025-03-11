@@ -1,9 +1,9 @@
 /* Base Styles */
-:root {
+/* :root {
     --button-font: 16px Arial, sans-serif;
     --button-padding: 8px 16px;
     --button-bg: #4CAF50;
-}
+} */
 
 body {
     font-family: 'Arial', sans-serif;
@@ -114,10 +114,16 @@ body {
     flex-wrap: wrap;
 }
 
-button {
-    font: var(--button-font);
-    padding: var(--button-padding);
-    background: var(--button-bg);
+button, .btn {
+    font: inherit; /* Inherit from parent */
+    padding: 6px 12px;
+    background: #4CAF50;
+    line-height: 1.5;
+    -webkit-appearance: none; /* Disable default mobile styles */
+    -moz-appearance: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
     
     border: none;
     border-radius: 4px;
@@ -132,20 +138,19 @@ button:hover {
 
 /* Import Button */
 .import-btn {
-    font: var(--button-font);
-    padding: var(--button-padding);
-    background: var(--button-bg);
-
     position: relative;
-    display: inline-flex;
-    align-items: center;
-    color: white;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: opacity 0.2s;
+    overflow: hidden;
 }
 
-.import-btn:hover {
+.import-btn input[type="file"] {
+    position: absolute;
+    opacity: 0;
+    width: 0.1px;
+    height: 0.1px;
+}
+
+/* Hover states */
+button:hover, .btn:hover {
     opacity: 0.9;
 }
 
