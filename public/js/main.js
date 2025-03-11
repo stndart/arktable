@@ -249,7 +249,7 @@ class GridManager {
         try {
             // Load data
             const [profileRes] = await Promise.all([
-                fetch('/data/profiles/default.json')
+                fetch('/default_profile')
             ]);
 
             // ensure characters are loaded
@@ -292,7 +292,7 @@ class GridManager {
     async ensureCharactersLoaded() {
         if (!this.characters || this.characters.length === 0 || !this.characterMap) {
             await this.loadCharacters(); // Ensure characters are loaded
-            console.log("onload", this.characterMap);
+            console.log("CharacterMap", this.characterMap);
         }
 
         if (!this.characters || this.characters.length === 0 || !this.characterMap) {

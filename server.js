@@ -18,15 +18,15 @@ const upload = multer({
 });
 
 // Configuration
-const DATA_PATH = path.join(__dirname, 'public/data');
-const CHAR_DATA_FILE = path.join(DATA_PATH, 'characters.json');
+const DATA_PATH = path.join(__dirname, '/data');
+const CHAR_DATA_FILE = 'public/data/characters.json';
 const SHARED_DIR = path.join(DATA_PATH, 'shared');
 const PROFILE_DIR = path.join(DATA_PATH, 'profiles');
 
-const USERS_FILE = 'public/data/users.json';
+const USERS_FILE = path.join(DATA_PATH, 'users.json');
 const JWT_SECRET = process.env.JWT_SECRET;
 
-const DEFAULT_PROFILE_PATH = path.join(PROFILE_DIR, 'default.json');
+const DEFAULT_PROFILE_PATH = path.join('public/data/profiles/default.json');
 
 if (!JWT_SECRET) {
     console.error('FATAL: JWT_SECRET not defined!');
@@ -37,6 +37,7 @@ if (!JWT_SECRET) {
 app.use(express.json());
 app.use(cookieParser());
 app.use(express.static('public'));
+app.use('/default_profile', express.static(DEFAULT_PROFILE_PATH));
 app.use('/characters', express.static(path.join(__dirname, 'public/characters')));
 
 // User storage helper
@@ -176,6 +177,7 @@ app.post('/api/register', async (req, res) => {
         const users = await getUsers();
 
         if (users.some(u => u.email === email)) {
+            console.log("400: Email already exists");
             return res.status(400).json({ error: 'Email already exists' });
         }
 
@@ -192,8 +194,8 @@ app.post('/api/register', async (req, res) => {
         res.json({ token });
 
     } catch (error) {
-        res.status(500).json({ error: 'Registration failed' });
         console.error("Registration failed", error);
+        res.status(500).json({ error: 'Registration failed' });
     }
 });
 
