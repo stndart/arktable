@@ -7,22 +7,51 @@ class GridManager {
         this.isSharedPage = window.location.pathname.startsWith('/share/');
         this.isEditable = false;
         this.grid = document.getElementById('characterGrid');
-        this.init();
+
+        this.loadingState = {
+            characters: false,
+            profile: false
+        };
+
+        this.init_basic();
         this.setupImport();
     }
 
-    async init() {
+    async init_basic() {
         this.state = { layout: [], marks: {} };
         this.characterMap = new Map();
-        await this.loadCharacters();
 
         this.handleDeleteBound = this.handleDelete.bind(this); // Store bound function once
 
         this.setupCoreEvents();
         if (!this.isSharedPage) {
-            // this.loadInitialState();
             this.setupControlButtons(); // Setup for regular page
         }
+    }
+
+    async initialize() {
+        this.showLoading(true);
+
+        try {
+            // Load characters first
+            await this.loadCharacters();
+
+            // Then load profile/state
+            if (this.isLoggedIn) {
+                await this.loadProfile();
+            } else {
+                await this.loadState();
+            }
+
+        } catch (error) {
+            console.error('Initialization failed:', error);
+        } finally {
+            this.showLoading(false);
+        }
+    }
+
+    showLoading(show) {
+        document.getElementById('loadingOverlay').style.display = show ? 'flex' : 'none';
     }
 
     async loadInitialState() {
@@ -89,7 +118,6 @@ class GridManager {
 
         document.getElementById('loadDefault').addEventListener('click', () => this.loadDefaultProfile());
 
-        // document.getElementById('addCharacter').addEventListener('click', () => this.addNewCharacter());
         document.getElementById('addCharacter').addEventListener('click', () => {
             sidebarManager.toggleSidebar();
         });
@@ -271,13 +299,10 @@ class GridManager {
         }
     }
 
-    async loadCharacterData() {
-        const response = await fetch('/api/characters');
-        const data = await response.json();
-        return data.characters;
-    }
-
     async loadCharacters() {
+        // console.log("loadCharacters");
+        this.loadingState.characters = true;
+
         try {
             const response = await fetch('/api/characters');
             const { characters } = await response.json();
@@ -286,6 +311,8 @@ class GridManager {
             this.characterMap = new Map(this.characters.map(c => [c.id, c]));
         } catch (error) {
             console.error('Error loading characters:', error);
+        } finally {
+            this.loadingState.characters = false;
         }
     }
 
@@ -449,30 +476,23 @@ class GridManager {
     }
 
     async loadProfile() {
+        this.loadingState.profile = true;
+
         if (this.isLoggedIn) {
-            const response = await fetch('/api/profile', {
-                headers: { 'Authorization': `Bearer ${this.token}` }
-            });
-            this.state = await response.json();
-            this.applyLayout();
-            this.applyState();
-        } else {
-            this.loadLocalState();
-        }
-    }
-
-    applyLayout() {
-        // Clear existing grid
-        this.grid.innerHTML = '';
-
-        // Add unique characters in order
-        const uniqueIDs = [...new Set(this.state.layout)];
-        uniqueIDs.forEach(charId => {
-            if (this.characterMap.has(charId)) {
-                const cell = this.createCharacterCell(this.characterMap.get(charId));
-                this.grid.appendChild(cell);
+            try {
+                const response = await fetch('/api/profile', {
+                    headers: { 'Authorization': `Bearer ${this.token}` }
+                });
+                this.state = await response.json();
+                this.applyLayout();
+                this.applyState();
+            } finally {
+                this.loadingState.profile = false;
             }
-        });
+
+        } else {
+            this.loadState();
+        }
     }
 
     async loadState(externalState) {
@@ -484,11 +504,7 @@ class GridManager {
         } else {
             console.log("Loading state from localStorage.");
 
-            // const cookieState = document.cookie.match(/userState=([^;]+)/);
-            // if (cookieState) {
-            //     state = JSON.parse(decodeURIComponent(cookieState[1]));
-            // }
-            const localStorageState = localStorage.getItem('userState');
+            const localStorageState = localStorage.getItem('gridState');
             if (localStorageState) {
                 state = JSON.parse(localStorageState);
             }
@@ -499,12 +515,32 @@ class GridManager {
             this.applyLayout();
             this.applyState();
 
-            this.logState();
+            // console.log("state applied");
+            // this.logState();
         }
         else {
             console.error("Empty state.")
         }
 
+    }
+
+    applyLayout() {
+        // Add visual placeholders first
+        this.grid.innerHTML = this.state.layout
+            .map(() => `<div class="cell-placeholder"></div>`)
+            .join('');
+
+        // Then populate with actual data
+        requestAnimationFrame(() => {
+            this.grid.innerHTML = '';
+            const uniqueIDs = [...new Set(this.state.layout)];
+            uniqueIDs.forEach(charId => {
+                if (this.characterMap.has(charId)) {
+                    const cell = this.createCharacterCell(this.characterMap.get(charId));
+                    this.grid.appendChild(cell);
+                }
+            });
+        });
     }
 
     applyState() {
@@ -549,6 +585,7 @@ class GridManager {
 
     async saveState() {
         const state = this.getCurrentState();
+        // console.log("save state")
 
         if (this.isLoggedIn) {
             await fetch('/api/save', {
@@ -645,7 +682,15 @@ class GridManager {
 // Initialize with share manager
 document.addEventListener('DOMContentLoaded', async () => {
     window.gridManager = new GridManager();
-    await gridManager.initializeAuth(); // Critical auth check
+
+    try {
+        await gridManager.initializeAuth(); // Critical auth check
+        await gridManager.initialize();
+    
+    } catch (error) {
+        console.error('Initialization error:', error);
+        gridManager.showError('Failed to load data');
+    }
 
     if (gridManager.isLoggedIn) {
         await gridManager.loadProfile();
