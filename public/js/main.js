@@ -282,19 +282,11 @@ class GridManager {
     }
 
     showSuccess(message) {
-        const alert = document.createElement('div');
-        alert.className = 'alert success';
-        alert.textContent = message;
-        document.body.appendChild(alert);
-        setTimeout(() => alert.remove(), 3000);
+        window.messageManager.showMessage('success', message);
     }
 
     showError(message) {
-        const alert = document.createElement('div');
-        alert.className = 'alert error';
-        alert.textContent = message;
-        document.body.appendChild(alert);
-        setTimeout(() => alert.remove(), 5000);
+        window.messageManager.showMessage('error', message);
     }
 
     handleDragStart(e) {

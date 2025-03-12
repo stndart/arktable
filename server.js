@@ -376,13 +376,12 @@ app.post('/admin/add', upload.single('image'), async (req, res) => {
         return res.status(403).send('Unauthorized');
     }
 
-    const { name, class: charClass, subclass: charSubclass, rarity } = req.body;
-    const id = name.toLowerCase().replace(/[^a-z0-9 -]/g, '').replace(/ /g, '_');
+    const { charId, name, class: charClass, subclass: charSubclass, rarity } = req.body;
+    const id = (charId) ? charId : name.toLowerCase().replace(/[^a-z0-9 -]/g, '').replace(/ /g, '_');
     const filename = `${id}.png`;
 
     // Read existing data
     const data = JSON.parse(await fs.readFile(CHAR_DATA_FILE));
-
     // Check for duplicate id
     if (data.characters.some(c => c.id === id)) {
         return res.status(400).json({ error: 'Character with this name already exists' });
@@ -482,6 +481,13 @@ app.post('/admin/update-file', adminAuth, async (req, res) => {
             return res.status(400).json({ error: 'ID must be lowercase alphanumeric' });
         }
 
+        // Read existing data
+        const data = JSON.parse(await fs.readFile(CHAR_DATA_FILE));
+        // Check for duplicate id
+        if (data.characters.some(c => c.id === id)) {
+            return res.status(400).json({ error: 'Character with this id already exists' });
+        }
+
         const newFilename = `${id}.png`;
         const charactersPath = path.join(__dirname, 'public/characters');
 
@@ -492,9 +498,6 @@ app.post('/admin/update-file', adminAuth, async (req, res) => {
         );
 
         // Update metadata
-        const metaPath = path.join(__dirname, 'public/data/characters.json');
-        const data = require(metaPath);
-
         const existingIndex = data.characters.findIndex(c => c.image === originalFile);
         const newCharacter = {
             id,
