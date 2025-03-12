@@ -568,7 +568,7 @@ app.delete('/admin/delete-file', adminAuth, async (req, res) => {
 // Start server
 init().then(() => {
     app.listen(process.env.PORT, () => {
-        console.log(`Server running on http://localhost:${process.env.PORT}`);
+        console.log(`Server running on ${process.env.BASE_URL}`);
         console.log(`Admin token: ${process.env.ADMIN_TOKEN}`);
     });
 });
