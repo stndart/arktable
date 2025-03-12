@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <title>Admin Panel</title>
     <link rel="stylesheet" href="../css/main.css">
     <link rel="stylesheet" href="../css/admin.css">
     <link rel="stylesheet" href="../css/messages.css">
 </head>
+
 <body>
     <div id="messageContainer" class="message-container"></div>
 
@@ -56,7 +58,7 @@
             <button class="filter-btn" data-filter="unindexed">Unindexed</button>
         </div>
         <div class="file-grid" id="fileGrid"></div>
-        
+
         <!-- Edit Modal -->
         <div class="modal" id="editModal">
             <div class="modal-content">
@@ -64,19 +66,18 @@
                 <h3>Edit Character Metadata</h3>
                 <form id="metadataForm">
                     <input type="hidden" id="originalFile">
-                    
+
                     <div class="form-group">
                         <label>ID:</label>
-                        <input type="text" id="charId" required 
-                               pattern="[_a-z0-9\-]+" 
-                               title="Lowercase letters, dashes and undescores only">
+                        <input type="text" id="charId" required pattern="[_a-z0-9\-]+"
+                            title="Lowercase letters, dashes and undescores only">
                     </div>
-                    
+
                     <div class="form-group">
                         <label>Name:</label>
                         <input type="text" id="charName" required>
                     </div>
-                    
+
                     <div class="form-group">
                         <label>Class:</label>
                         <select id="charClass" required>
@@ -90,12 +91,14 @@
                             <option value="Vanguard">Vanguard</option>
                         </select>
                     </div>
-                    
+
                     <div class="form-group">
                         <label>Subclass:</label>
-                        <input type="text" id="charSubclass" required>
+                        <select id="charSubclass" required>
+                            <!-- Options will be populated dynamically -->
+                        </select>
                     </div>
-                    
+
                     <div class="form-group">
                         <label>Rarity:</label>
                         <select id="charRarity" required>
@@ -112,4 +115,5 @@
     <script src="../js/messages.js"></script>
     <script src="../js/admin.js"></script>
 </body>
+
 </html>

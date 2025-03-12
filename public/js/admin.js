@@ -56,6 +56,9 @@ class FileManager {
         // Get token from URL
         const urlParams = new URLSearchParams(window.location.search);
         this.adminToken = urlParams.get('token');
+        
+        this.subclasses = {};
+        this.loadSubclasses();
 
         this.fileGrid = document.getElementById('fileGrid');
         this.editModal = document.getElementById('editModal');
@@ -63,6 +66,15 @@ class FileManager {
         document.body.appendChild(this.contextMenu);
         this.setupContextMenu();
         this.init();
+    }
+
+    async loadSubclasses() {
+        try {
+            const response = await fetch('/api/subclasses');
+            this.subclasses = await response.json();
+        } catch (error) {
+            console.error('Failed to load subclasses:', error);
+        }
     }
 
     async init() {
@@ -190,10 +202,40 @@ class FileManager {
             filename.replace(/\.png$/, '').toLowerCase();
         document.getElementById('charName').value = file?.metadata?.name || '';
         document.getElementById('charClass').value = file?.metadata?.class || '';
-        document.getElementById('charSubclass').value = file?.metadata?.subclass || '';
         document.getElementById('charRarity').value = file?.metadata?.rarity?.toString() || '4';
+        
+        this.setupClassSubclassBinding();
+        this.updateSubclassOptions(file?.metadata?.class);
+        document.getElementById('charSubclass').value = file?.metadata?.subclass || '';
 
         this.editModal.style.display = 'block';
+    }
+
+    setupClassSubclassBinding() {
+        const classSelect = document.getElementById('charClass');
+        classSelect.addEventListener('change', () => {
+            this.updateSubclassOptions(classSelect.value);
+        });
+    }
+
+    updateSubclassOptions(className) {
+        const subclassSelect = document.getElementById('charSubclass');
+        subclassSelect.innerHTML = '';
+        
+        if (this.subclasses[className]) {
+            this.subclasses[className].forEach(subclass => {
+                const option = document.createElement('option');
+                option.value = subclass;
+                option.textContent = subclass;
+                subclassSelect.appendChild(option);
+            });
+        } else {
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = 'No subclasses available';
+            option.disabled = true;
+            subclassSelect.appendChild(option);
+        }
     }
 
     async deleteFile(filename) {
@@ -346,5 +388,5 @@ new AdminManager();
 
 // Initialize after admin auth
 document.addEventListener('DOMContentLoaded', () => {
-    new FileManager();
+    window.charManager = new FileManager();
 });

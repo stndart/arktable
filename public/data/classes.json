@@ -1,0 +1,10 @@
+{
+    "Caster": ["Core", "Splash", "Blast", "Chain", "Mech-Accord", "Phalanx", "Mystic", "Primal", "Shaper"],
+    "Defender": ["Protector", "Guardian", "Juggernaut", "Arts Protector", "Duelist", "Fortress", "Sentry Protector", "Primal Protector"],
+    "Guard": ["Dreadnought", "Centurion", "Lord", "Arts Fighter", "Instructor", "Brawler", "Swordmaster", "Musha", "Liberator", "Reaper", "Crusher", "Earthshaker"],
+    "Medic": ["Single-Target", "Multi-target", "Therapist", "Wandering", "Incantation", "Chain"],
+    "Sniper": ["Marksman", "Artilleryman", "Deadeye", "Heavyshooter", "Spreadshooter", "Besieger", "Flinger", "Hunter", "Loopshoter"],
+    "Specialist": ["Push Stroker", "Hookmaster", "Executor", "Ambusher", "Geek", "Merchant", "Trapmaster", "Dollkeeper", "Alchemist", "Skyranger"],
+    "Supporter": ["Decel Binder", "Summoner", "Hexer", "Bard", "Abjurer", "Artificer", "Ritualist"],
+    "Vanguard": ["Pioneer", "Charger", "Standard Bearer", "Tactician", "Agent"]
+}
