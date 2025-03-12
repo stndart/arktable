@@ -7,7 +7,17 @@ class GridManager {
         this.isSharedPage = window.location.pathname.startsWith('/shared/');
         this.isPersistentShare = window.location.pathname.startsWith('/shared/user/');
         this.shareId = this.getShareIdFromURL();
+        
         this.isEditable = !this.isSharedPage;
+        if (this.isSharedPage) {
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('edit') === 'true') {
+                this.isEditable = true;
+            }
+            else {
+                this.isEditable = false;
+            }
+        }
         console.log("is editable?", this.isEditable);
 
         this.grid = document.getElementById('characterGrid');
