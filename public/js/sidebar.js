@@ -5,7 +5,7 @@ class SidebarManager {
         this.overlay = document.createElement('div');
         this.overlay.className = 'sidebar-overlay';
         document.body.appendChild(this.overlay);
-        
+
         this.initEventListeners();
         this.loadCharacters();
     }
@@ -32,8 +32,14 @@ class SidebarManager {
     }
 
     displayCharacters(characters) {
+        // Create a Set of IDs from the grid layout
+        const layoutIds = new Set(this.gridManager.state.layout);
+
+        // Filter characters that are not in the grid layout
+        const missingCharacters = characters.filter(char => !layoutIds.has(char.id));
+
         const container = document.getElementById('sidebarGrid');
-        container.innerHTML = characters.map(char => `
+        container.innerHTML = missingCharacters.map(char => `
             <div class="sidebar-character" data-id="${char.id}">
                 <img src="/characters/${char.image}" alt="${char.name}" title="${char.name}">
             </div>
@@ -43,12 +49,13 @@ class SidebarManager {
         container.querySelectorAll('.sidebar-character').forEach(el => {
             el.addEventListener('click', () => {
                 this.gridManager.addCharacterById(el.dataset.id);
+                this.displayCharacters(characters);
             });
         });
     }
 
     filterCharacters(query) {
-        const filtered = this.allCharacters.filter(char => 
+        const filtered = this.allCharacters.filter(char =>
             char.id.toLowerCase().includes(query) ||
             char.name.toLowerCase().includes(query)
         );
