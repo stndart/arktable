@@ -6,6 +6,7 @@ const multer = require('multer');
 const cookieParser = require('cookie-parser');
 const { Console } = require('console');
 const crypto = require('crypto');
+const chokidar = require('chokidar');
 
 const createHash = crypto.createHash;
 const jwt = require('jsonwebtoken');
@@ -23,14 +24,23 @@ const DATA_PATH = path.join(__dirname, '/data');
 const SHARED_DIR = path.join(DATA_PATH, 'shared');
 const PROFILE_DIR = path.join(DATA_PATH, 'profiles');
 
-const CHAR_DATA_FILE = './public/data/characters.json';
+const PUBLIC_DATA_PATH = path.join(__dirname, 'public/data')
+const CHARACTERS_DIR = path.join(__dirname, 'public/characters');
+const SUBCLASSES_FILE = path.join(PUBLIC_DATA_PATH, 'classes.json');
+const CHAR_DATA_FILE = path.join(PUBLIC_DATA_PATH, 'characters.json');
 // function getValidCharIds() {
 //     return new Set(require(CHAR_DATA_FILE).characters.map(char => char.id));
 // }
 let charData = require(CHAR_DATA_FILE);
 let validCharIds = new Set(charData.characters.map(char => char.id));
 
-fs.watch(CHAR_DATA_FILE, () => {
+const watcher = chokidar.watch(CHAR_DATA_FILE, {
+    persistent: true,
+    ignoreInitial: true
+});
+
+watcher.on('change', () => {
+    // console.log("Detected char data file change");
     delete require.cache[require.resolve(CHAR_DATA_FILE)];
     charData = require(CHAR_DATA_FILE);
     validCharIds = new Set(charData.characters.map(char => char.id));
@@ -127,6 +137,15 @@ async function init() {
 }
 
 // API Endpoints
+
+app.get('/api/subclasses', async (req, res) => {
+    try {
+        const data = await fs.readFile(SUBCLASSES_FILE);
+        res.json(JSON.parse(data));
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to load subclasses' });
+    }
+});
 
 // Get all characters
 app.get('/api/characters', async (req, res) => {
@@ -446,14 +465,17 @@ app.post('/admin/remove-index', adminAuth, async (req, res) => {
 // Get all character files with metadata status
 app.get('/admin/files', adminAuth, async (req, res) => {
     try {
-        const files = await fs.readdir(path.join(__dirname, 'public/characters'));
+        const files = await fs.readdir(CHARACTERS_DIR);
         const metadata = require('./public/data/characters.json').characters;
 
         const fileData = await Promise.all(files.map(async (file) => {
             if (!file.endsWith('.png')) return null;
 
-            const stats = await fs.stat(path.join(__dirname, 'public/characters', file));
-            const existing = metadata.find(c => c.image === file);
+            // console.log(metadata);
+            // console.log(charData.characters);
+
+            const stats = await fs.stat(path.join(CHARACTERS_DIR, file));
+            const existing = charData.characters.find(c => c.image === file);
 
             return {
                 filename: file,
@@ -467,6 +489,7 @@ app.get('/admin/files', adminAuth, async (req, res) => {
         res.json(fileData.filter(Boolean));
     } catch (error) {
         res.status(500).json({ error: 'File scan failed' });
+        console.error("File scan error", error);
     }
 });
 
@@ -484,9 +507,9 @@ app.post('/admin/update-file', adminAuth, async (req, res) => {
         // Read existing data
         const data = JSON.parse(await fs.readFile(CHAR_DATA_FILE));
         // Check for duplicate id
-        if (data.characters.some(c => c.id === id)) {
-            return res.status(400).json({ error: 'Character with this id already exists' });
-        }
+        // if (data.characters.some(c => c.id === id)) {
+        //     return res.status(400).json({ error: 'Character with this id already exists' });
+        // }
 
         const newFilename = `${id}.png`;
         const charactersPath = path.join(__dirname, 'public/characters');
@@ -514,7 +537,7 @@ app.post('/admin/update-file', adminAuth, async (req, res) => {
             data.characters.push(newCharacter);
         }
 
-        await fs.writeFile(metaPath, JSON.stringify(data, null, 2));
+        await fs.writeFile(CHAR_DATA_FILE, JSON.stringify(data, null, 2));
         res.json({ success: true, newFilename });
     } catch (error) {
         console.log("Error updating file", error);
