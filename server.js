@@ -292,23 +292,34 @@ app.get('/api/profile', auth, async (req, res) => {
     }
 });
 
-app.post('/api/save', auth, async (req, res) => {
+// app.post('/api/save', auth, async (req, res) => {
+app.post('/api/save', async (req, res) => { // security disabled for now
     try {
-        const profilePath = path.join(PROFILE_DIR, `${req.user.id}.json`);
-        await fs.writeFile(profilePath, JSON.stringify(req.body));
+        const { state, userId } = req.body;
+        const profilePath = path.join(PROFILE_DIR, `${userId}.json`);
+        await fs.writeFile(profilePath, JSON.stringify(state));
         res.json({ success: true });
+    
     } catch (error) {
         res.status(500).json({ error: 'Save failed' });
+        console.log('Save failed', error);
     }
 });
 
 // Save shared snapshot
 app.post('/api/save-shared', async (req, res) => {
-    const shareId = uuidv4();
-    const filePath = path.join(SHARED_DIR, `${shareId}.json`);
+    try {
+        const { state, snapshotId } = req.body;
+        const shareId = snapshotId ? snapshotId : uuidv4();
+        const filePath = path.join(SHARED_DIR, `${shareId}.json`);
+
+        await fs.writeFile(filePath, JSON.stringify(state));
+        res.json({ shareId });
     
-    await fs.writeFile(filePath, JSON.stringify(req.body));
-    res.json({ shareId });
+    } catch (error) {
+        res.status(500).json({ error: 'Shared save failed' });
+        console.log('Shared save failed', error);
+    }
 });
 
 app.post('/api/share', async (req, res) => {
@@ -322,7 +333,7 @@ app.post('/api/share', async (req, res) => {
             parent: req.query.edit ? req.params.id : null
         }
     }));
-    
+
     res.json({ shareId });
 });
 

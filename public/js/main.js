@@ -647,7 +647,7 @@ class GridManager {
 
     async saveState() {
         const state = this.getCurrentState();
-        console.log("save state, shared?", this.isSharedPage, "logged in?", this.isLoggedIn);
+        // console.log("save state, shared?", this.isSharedPage, "logged in?", this.isLoggedIn);
 
         // For shared pages in edit mode
         if (this.isSharedPage && this.isEditable) {
@@ -665,22 +665,45 @@ class GridManager {
     }
 
     async saveToServer(state) {
-        const endpoint = (this.isSharedPage && !this.isPersistentShare)
-            ? '/api/save-shared'
-            : '/api/save';
+        if (this.isSharedPage && !this.isPersistentShare) {
+            await this.saveSnapshotToServer(state);
+            return;
+        }
 
-        console.log("saving to server", endpoint, state);
+        const c_userId = (this.userId) ? this.userId : this.shareId;
+        // console.log("saving to server", c_userId);
 
-        const response = await fetch(endpoint, {
+        const response = await fetch('/api/save', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${this.token}`
             },
-            body: JSON.stringify(state)
+            body: JSON.stringify({
+                state,
+                userId: c_userId
+            })
         });
 
         if (!response.ok) throw new Error('Save failed');
+    }
+
+    async saveSnapshotToServer(state) {
+        // console.log("saving snapshot to server", this.shareId, state);
+
+        const response = await fetch('/api/save-shared', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${this.token}`
+            },
+            body: JSON.stringify({
+                state,
+                snapshotId: this.shareId
+            })
+        });
+
+        if (!response.ok) throw new Error('Snapshot save failed');
     }
 
     async saveSharedState(state) {
@@ -688,9 +711,12 @@ class GridManager {
             // Save to original user's profile
             await this.saveToServer(state);
         } else {
-            // Create new snapshot and update URL
-            const { shareId } = await this.createSnapshot(state);
-            this.updateSharedUrl(shareId);
+            // Save snapshot edits on server
+            await this.saveSnapshotToServer(state);
+
+            // // Create new snapshot and update URL
+            // const { shareId } = await this.createSnapshot(state);
+            // this.updateSharedUrl(shareId);
         }
     }
 
