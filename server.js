@@ -9,6 +9,7 @@ const crypto = require('crypto');
 
 const createHash = crypto.createHash;
 const jwt = require('jsonwebtoken');
+const { userInfo } = require('os');
 const uuidv4 = require('uuid').v4;
 
 const app = express();
@@ -23,8 +24,17 @@ const SHARED_DIR = path.join(DATA_PATH, 'shared');
 const PROFILE_DIR = path.join(DATA_PATH, 'profiles');
 
 const CHAR_DATA_FILE = './public/data/characters.json';
-const charData = require(CHAR_DATA_FILE);
-const validCharIds = new Set(charData.characters.map(char => char.id));
+// function getValidCharIds() {
+//     return new Set(require(CHAR_DATA_FILE).characters.map(char => char.id));
+// }
+let charData = require(CHAR_DATA_FILE);
+let validCharIds = new Set(charData.characters.map(char => char.id));
+
+fs.watch(CHAR_DATA_FILE, () => {
+    delete require.cache[require.resolve(CHAR_DATA_FILE)];
+    charData = require(CHAR_DATA_FILE);
+    validCharIds = new Set(charData.characters.map(char => char.id));
+});
 
 const USERS_FILE = path.join(DATA_PATH, 'users.json');
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -80,7 +90,11 @@ const auth = async (req, res, next) => {
         const users = await getUsers();
         const user = users.find(u => u.id === decoded.userId);
 
-        if (!user) throw new Error('User not found');
+        if (!user) {
+            res.status(401).json({ error: 'Unauthorized' });
+            console.log("User not found:", user);
+            return;
+        }
 
         req.user = user;
         next();
@@ -144,6 +158,7 @@ app.post('/api/import', async (req, res) => {
         }
 
         // Validate that every layout id exists in our character data
+        // const validCharIds = getValidCharIds(); // now updated dynamically
         const allLayoutIdsValid = layout.every(id => validCharIds.has(id));
         if (!allLayoutIdsValid) {
             return res.status(400).json({ error: 'Some layout character IDs do not exist' });
@@ -231,20 +246,30 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-app.get('/api/validate-token', (req, res) => {
+app.get('/api/validate-token', async (req, res) => {
     const token = req.headers.authorization?.split(' ')[1];
 
     if (!token) {
         return res.status(401).json({ valid: false });
     }
 
-    jwt.verify(token, JWT_SECRET, (err, decoded) => {
+    jwt.verify(token, JWT_SECRET, async (err, decoded) => {
         if (err) {
             return res.status(401).json({
                 valid: false,
                 error: err.name === 'TokenExpiredError'
                     ? 'Token expired'
                     : 'Invalid token'
+            });
+        }
+
+        // check userId is valid
+        const users = await getUsers();
+        const userExists = users.some(user => user.id === decoded.userId);
+        if (!userExists) {
+            return res.status(401).json({
+                valid: false,
+                error: 'User not found'
             });
         }
 

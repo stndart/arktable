@@ -107,7 +107,10 @@ class GridManager {
     }
 
     async initializeAuth() {
-        if (!this.token) return;
+        if (!this.token) {
+            this.clearAuth();
+            return;
+        };
 
         try {
             const { valid, userId } = await this.validateToken(this.token);
