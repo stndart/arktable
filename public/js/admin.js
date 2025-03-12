@@ -4,7 +4,7 @@ class AdminManager {
         // Get token from URL
         const urlParams = new URLSearchParams(window.location.search);
         this.adminToken = urlParams.get('token');
-        
+
         // Validate token presence
         if (!this.adminToken) {
             window.location.href = '/';
@@ -19,7 +19,7 @@ class AdminManager {
         this.form.addEventListener('submit', async e => {
             e.preventDefault();
             const formData = new FormData(this.form);
-            
+
             try {
                 const response = await fetch('/admin/add', {
                     method: 'POST',
@@ -30,7 +30,7 @@ class AdminManager {
                 });
 
                 console.log(response);
-                
+
                 if (response.ok) {
                     alert('Character added successfully!');
                     this.form.reset();
@@ -96,7 +96,7 @@ class FileManager {
             item.addEventListener('click', async () => {
                 const action = item.dataset.action;
                 this.contextMenu.style.display = 'none';
-                
+
                 if (action === 'remove-index') {
                     await this.removeIndex();
                 }
@@ -128,12 +128,12 @@ class FileManager {
         try {
             const url = new URL('/admin/files', window.location.href);
             url.searchParams.set('token', new URLSearchParams(window.location.search).get('token'));
-            
+
             const response = await fetch(url);
             let files = await response.json();
-            
+
             if (filter !== 'all') {
-                files = files.filter(f => 
+                files = files.filter(f =>
                     filter === 'indexed' ? f.indexed : !f.indexed
                 );
             }
@@ -160,12 +160,12 @@ class FileManager {
                 </div>
             </div>
         `).join('');
-    
+
         // Update event listeners
         document.querySelectorAll('.file-preview').forEach(img => {
             img.addEventListener('click', () => this.showEditModal(img.dataset.file));
         });
-        
+
         document.querySelectorAll('.delete-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -177,28 +177,28 @@ class FileManager {
     async showEditModal(filename) {
         const url = new URL('/admin/files', window.location.href);
         url.searchParams.set('token', new URLSearchParams(window.location.search).get('token'));
-        
+
         const response = await fetch(url);
         let files = await response.json();
         const file = files.find(f => f.filename === filename);
-        
+
         const form = document.getElementById('metadataForm');
         form.reset();
-        
+
         document.getElementById('originalFile').value = filename;
-        document.getElementById('charId').value = file?.metadata?.id || 
+        document.getElementById('charId').value = file?.metadata?.id ||
             filename.replace(/\.png$/, '').toLowerCase();
         document.getElementById('charName').value = file?.metadata?.name || '';
         document.getElementById('charClass').value = file?.metadata?.class || '';
         document.getElementById('charSubclass').value = file?.metadata?.subclass || '';
         document.getElementById('charRarity').value = file?.metadata?.rarity?.toString() || '4';
-        
+
         this.editModal.style.display = 'block';
     }
 
     async deleteFile(filename) {
         if (!confirm(`Permanently delete ${filename}?`)) return;
-        
+
         try {
             const url = new URL('/admin/delete-file', window.location.href);
             url.searchParams.set('token', new URLSearchParams(window.location.search).get('token'));
@@ -216,7 +216,7 @@ class FileManager {
     setupFilters() {
         document.querySelectorAll('.filter-btn').forEach(btn => {
             btn.addEventListener('click', () => {
-                document.querySelectorAll('.filter-btn').forEach(b => 
+                document.querySelectorAll('.filter-btn').forEach(b =>
                     b.classList.remove('active'));
                 btn.classList.add('active');
                 this.loadFiles(btn.dataset.filter);
@@ -226,22 +226,22 @@ class FileManager {
 
     setupModal() {
         const closeModal = () => this.editModal.style.display = 'none';
-        
+
         document.querySelector('.close-btn').addEventListener('click', closeModal);
         window.onclick = (e) => e.target === this.editModal && closeModal();
-        
+
         this.metadataForm = document.getElementById('metadataForm');
         this.metadataForm.addEventListener('submit', this.handleSubmit.bind(this));
-        document.querySelector(".save-btn").addEventListener("click", function() {
+        document.querySelector(".save-btn").addEventListener("click", function () {
             document.getElementById('metadataForm').dispatchEvent(new Event('submit'));
         }); // cursed
     }
 
     validateForm(form) {
         let isValid = true;
-        
+
         // Required fields
-        const requiredFields = ['charId', 'charName', 'charClass', 'charSubclass', 'charRarity'];
+        const requiredFields = ['charName', 'charClass', 'charSubclass', 'charRarity'];
         requiredFields.forEach(id => {
             const field = document.getElementById(id);
             if (!field.value.trim()) {
@@ -251,19 +251,19 @@ class FileManager {
                 this.clearFieldError(field);
             }
         });
-    
+
         // ID format validation
         const idField = document.getElementById('charId');
         if (!/^[_a-z0-9\-]+$/.test(idField.value)) {
             this.showFieldError(idField, 'Only lowercase letters allowed');
             isValid = false;
         }
-    
+
         return isValid;
     }
 
     showFieldError(field, message) {
-        const errorElement = field.parentElement.querySelector('.error-message') || 
+        const errorElement = field.parentElement.querySelector('.error-message') ||
             document.createElement('div');
         errorElement.className = 'error-message';
         errorElement.textContent = message;
@@ -272,7 +272,7 @@ class FileManager {
         field.parentElement.appendChild(errorElement);
         field.style.borderColor = '#ff4444';
     }
-    
+
     clearFieldError(field) {
         const errorElement = field.parentElement.querySelector('.error-message');
         if (errorElement) errorElement.remove();
@@ -281,10 +281,10 @@ class FileManager {
 
     async handleSubmit(e) {
         e.preventDefault();
-        
+
         const form = document.getElementById('metadataForm');
         if (!this.validateForm(form)) return;
-        
+
         const formData = {
             originalFile: document.getElementById('originalFile').value,
             id: document.getElementById('charId').value,
@@ -303,14 +303,24 @@ class FileManager {
                 },
                 body: JSON.stringify(formData)
             });
-    
-            if (!response.ok) throw new Error('Update failed');
-            
+            const { error } = await response.json();
+
+            if (!response.ok) {
+                if (response.status == 400 && error == "Character with this id already exists") {
+                    this.showErrorMessage(error);
+                    console.error(error);
+                    return;
+                }
+                else {
+                    throw new Error('Update failed: ' + response.error);
+                }
+            }
+
             // Close modal and refresh list
             this.closeModal();
             await this.loadFiles();
             this.showSuccessMessage('Changes saved!');
-            
+
         } catch (error) {
             this.showErrorMessage(`Save failed: ${error.message}`);
             console.error('Submission error:', error);
@@ -321,21 +331,13 @@ class FileManager {
         this.editModal.style.display = 'none';
         this.metadataForm.reset();
     }
-    
+
     showSuccessMessage(text) {
-        const alert = document.createElement('div');
-        alert.className = 'alert success';
-        alert.textContent = text;
-        document.body.appendChild(alert);
-        setTimeout(() => alert.remove(), 3000);
+        window.messageManager.showMessage('success', text);
     }
-    
+
     showErrorMessage(text) {
-        const alert = document.createElement('div');
-        alert.className = 'alert error';
-        alert.textContent = text;
-        document.body.appendChild(alert);
-        setTimeout(() => alert.remove(), 5000);
+        window.messageManager.showMessage('error', text);
     }
 }
 
