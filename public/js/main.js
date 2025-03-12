@@ -660,7 +660,7 @@ class GridManager {
                 await this.saveToServer(state);
             }
             localStorage.setItem('gridState', JSON.stringify(state));
-            console.log("Saved to local storage");
+            // console.log("Saved to local storage");
         }
     }
 
@@ -713,10 +713,6 @@ class GridManager {
         } else {
             // Save snapshot edits on server
             await this.saveSnapshotToServer(state);
-
-            // // Create new snapshot and update URL
-            // const { shareId } = await this.createSnapshot(state);
-            // this.updateSharedUrl(shareId);
         }
     }
 
@@ -735,7 +731,15 @@ class GridManager {
     }
 
     async sharePersistent(editable) {
-        return `${window.location.origin}/shared/user/${this.userId}${editable ? '?edit=true' : ''}`;
+        if (!this.isSharedPage) {
+            return `${window.location.origin}/shared/user/${this.userId}${editable ? '?edit=true' : ''}`;
+        
+        } else if (this.isPersistentShare) {
+            return `${window.location.origin}/shared/user/${this.shareId}${(editable && this.isEditable) ? '?edit=true' : ''}`;
+        
+        } else {
+            return `${window.location.origin}/shared/${this.shareId}${(editable && this.isEditable) ? '?edit=true' : ''}`;
+        }
     }
 
     updateSharedUrl(newShareId) {
