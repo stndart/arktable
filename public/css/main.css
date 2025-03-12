@@ -20,7 +20,7 @@ body {
     padding: 20px;
     background: white;
     border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     transition: all 0.3s ease;
 }
 
@@ -47,7 +47,7 @@ body {
 
 .character-cell:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
 }
 
 /* Character Image */
@@ -81,16 +81,21 @@ body {
     position: absolute;
     top: 0;
     left: 0;
-    width: 100%;   /* Stretch circle to fill the container */
-    height: 100%;  /* Stretch circle to fill the container */
-    background-size: contain;  /* Scale the circle image to fit the container */
+    width: 100%;
+    /* Stretch circle to fill the container */
+    height: 100%;
+    /* Stretch circle to fill the container */
+    background-size: contain;
+    /* Scale the circle image to fit the container */
     background-repeat: no-repeat;
     opacity: 0;
-    transition: opacity 0.3s; /* Optional smooth transition */
+    transition: opacity 0.3s;
+    /* Optional smooth transition */
 }
 
 .circle.show {
-    opacity: 1; /* Make the circle visible when the class 'show' is added */
+    opacity: 1;
+    /* Make the circle visible when the class 'show' is added */
 }
 
 /* Specific background images for each circle (M3.png, M6.png, M9.png) */
@@ -114,17 +119,20 @@ body {
     flex-wrap: wrap;
 }
 
-button, .btn {
-    font: inherit; /* Inherit from parent */
+button,
+.btn {
+    font: inherit;
+    /* Inherit from parent */
     padding: 6px 12px;
     background: #4CAF50;
     line-height: 1.5;
-    -webkit-appearance: none; /* Disable default mobile styles */
+    -webkit-appearance: none;
+    /* Disable default mobile styles */
     -moz-appearance: none;
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    
+
     border: none;
     border-radius: 4px;
     color: white;
@@ -150,7 +158,8 @@ button:hover {
 }
 
 /* Hover states */
-button:hover, .btn:hover {
+button:hover,
+.btn:hover {
     opacity: 0.9;
 }
 
@@ -171,14 +180,16 @@ button:hover, .btn:hover {
     position: absolute;
     width: 20px;
     height: 20px;
-    border: 3px solid rgba(255,255,255,0.3);
+    border: 3px solid rgba(255, 255, 255, 0.3);
     border-radius: 50%;
     border-top-color: #fff;
     animation: spin 1s linear infinite;
 }
 
 @keyframes spin {
-    to { transform: rotate(360deg); }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 /* Context Menu */
@@ -187,7 +198,7 @@ button:hover, .btn:hover {
     background: white;
     border: 1px solid #ddd;
     border-radius: 4px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
     z-index: 1000;
 }
 
@@ -247,7 +258,7 @@ button:hover, .btn:hover {
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(255,255,255,0.8);
+    background: rgba(255, 255, 255, 0.8);
     display: none;
     justify-content: center;
     align-items: center;
@@ -263,7 +274,7 @@ button:hover, .btn:hover {
     background: white;
     padding: 20px;
     border-radius: 8px;
-    box-shadow: 0 0 10px rgba(0,0,0,0.2);
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
     z-index: 1000;
 }
 
@@ -281,6 +292,51 @@ button:hover, .btn:hover {
     border: none;
     border-radius: 4px;
     cursor: pointer;
+}
+
+/* Add share dialog styles */
+.share-type {
+    padding: 10px;
+    border-radius: 4px;
+    margin: 10px 0;
+}
+
+.share-type.persistent {
+    background: #e3f2fd;
+    color: #1976d2;
+}
+
+.share-type.snapshot {
+    background: #fff3e0;
+    color: #ef6c00;
+}
+
+.notice {
+    font-size: 0.9em;
+    color: #666;
+    margin-top: 10px;
+}
+
+.share-type {
+    padding: 10px;
+    border-radius: 4px;
+    margin: 10px 0;
+}
+
+.share-type.persistent {
+    background: #e3f2fd;
+    color: #1976d2;
+}
+
+.share-type.snapshot {
+    background: #fff3e0;
+    color: #ef6c00;
+}
+
+.notice {
+    font-size: 0.9em;
+    color: #666;
+    margin-top: 10px;
 }
 
 /* Import Button */
@@ -308,7 +364,7 @@ button:hover, .btn:hover {
     width: 600px;
     height: 100vh;
     background: white;
-    box-shadow: -2px 0 8px rgba(0,0,0,0.1);
+    box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
     transition: right 0.3s ease;
     z-index: 1000;
     display: flex;
@@ -357,7 +413,8 @@ button:hover, .btn:hover {
 }
 
 /* Mobile Styles */
-@media (max-width: 768px), (orientation: portrait) {
+@media (max-width: 768px),
+(orientation: portrait) {
     .sidebar-container {
         width: 100%;
         height: 50vh;
@@ -366,7 +423,7 @@ button:hover, .btn:hover {
         top: auto;
         transition: bottom 0.3s ease;
     }
-    
+
     .sidebar-container.active {
         bottom: 0;
         right: 0;
@@ -380,7 +437,7 @@ button:hover, .btn:hover {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0,0,0,0.4);
+    background: rgba(0, 0, 0, 0.4);
     z-index: 999;
     display: none;
 }
@@ -403,7 +460,7 @@ button:hover, .btn:hover {
 
 .sidebar-character:hover {
     transform: translateY(-2px);
-    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
 }
 
 /* Image container */
@@ -424,6 +481,32 @@ button:hover, .btn:hover {
     transform: translate(-50%, -50%);
     color: #999;
     font-size: 0.8em;
+}
+
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.8);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.cell-placeholder {
+    background: #f0f0f0;
+    border: 2px dashed #ddd;
+    border-radius: 8px;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 0.6; }
+    50% { opacity: 1; }
+    100% { opacity: 0.6; }
 }
 
 /* Text container */
@@ -451,7 +534,7 @@ button:hover, .btn:hover {
     .sidebar-grid {
         grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
     }
-    
+
     .sidebar-character img {
         height: 80px;
     }

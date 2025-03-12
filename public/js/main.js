@@ -1,29 +1,160 @@
 class GridManager {
     constructor() {
-        this.isSharedPage = window.location.pathname.startsWith('/share/');
-        this.isEditable = false;
+        this.token = localStorage.getItem('jwt');
+        this.isLoggedIn = false;
+        this.userId = null;
+
+        this.isSharedPage = window.location.pathname.startsWith('/shared/');
+        this.isPersistentShare = window.location.pathname.startsWith('/shared/user/');
+        this.shareId = this.getShareIdFromURL();
+        
+        this.isEditable = !this.isSharedPage;
+        if (this.isSharedPage) {
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('edit') === 'true') {
+                this.isEditable = true;
+            }
+            else {
+                this.isEditable = false;
+            }
+        }
+        console.log("is editable?", this.isEditable);
+
         this.grid = document.getElementById('characterGrid');
-        this.init();
+
+        this.loadingState = {
+            characters: false,
+            profile: false
+        };
+        this.cellCache = new Map(); // Add this line
+
+        this.shareManager = new ShareManager(this);
+
+        // Bind share button click
+        document.getElementById('share').addEventListener('click', () => {
+            this.shareManager.show();
+        });
+
+        this.init_basic();
         this.setupImport();
     }
 
-    async init() {
+    async init_basic() {
         this.state = { layout: [], marks: {} };
         this.characterMap = new Map();
-        await this.loadCharacters();
 
         this.handleDeleteBound = this.handleDelete.bind(this); // Store bound function once
-        
-        this.setupCoreEvents();
+
+        if (this.isEditable) {
+            this.setupCoreEvents();
+        }
         if (!this.isSharedPage) {
-            this.loadInitialState();
             this.setupControlButtons(); // Setup for regular page
         }
     }
 
-    async loadInitialState() {
-        await this.loadDefaultProfile();
-        this.loadState();
+    async initialize() {
+        console.log('initialize with shared?', this.isSharedPage);
+        if (this.isSharedPage) {
+            await this.loadSharedData();
+        } else {
+            await this.loadUserData();
+        }
+    }
+
+    async loadUserData() {
+        this.showLoading(true);
+
+        try {
+            // Load characters first
+            await this.loadCharacters();
+
+            // Then load profile/state
+            if (this.isLoggedIn) {
+                await this.loadProfile();
+            } else {
+                await this.loadState();
+            }
+
+        } catch (error) {
+            console.error('loadUserData failed:', error);
+        } finally {
+            this.showLoading(false);
+        }
+    }
+
+    async loadSharedData() {
+        console.log("loading shared data");
+
+        const endpoint = this.isPersistentShare
+            ? `/api/shared/user/${this.shareId}`
+            : `/api/shared/${this.shareId}`;
+
+        try {
+            const response = await fetch(endpoint);
+            this.state = await response.json();
+            await this.loadCharacters();
+            this.applyLayout();
+        } catch (error) {
+            console.error('Failed to load shared data:', error);
+            this.showError(
+                this.isPersistentShare
+                    ? 'Could not load persistent grid'
+                    : 'Shared snapshot expired or invalid'
+            );
+            setTimeout(() => window.location = '/', 3000);
+        }
+    }
+
+    getShareIdFromURL() {
+        const pathParts = window.location.pathname.split('/');
+        if (this.isPersistentShare) return pathParts[3]; // user ID
+        return pathParts[2]; // snapshot ID
+    }
+
+    showLoading(show) {
+        document.getElementById('loadingOverlay').style.display = show ? 'flex' : 'none';
+    }
+
+    async initializeAuth() {
+        if (!this.token) {
+            this.clearAuth();
+            return;
+        };
+
+        try {
+            const { valid, userId } = await this.validateToken(this.token);
+            this.isLoggedIn = valid;
+            this.userId = userId;
+
+            if (!valid) {
+                localStorage.removeItem('jwt');
+            }
+        } catch (error) {
+            console.error('Auth validation failed:', error);
+            this.clearAuth();
+        }
+    }
+
+    async validateToken(token) {
+        const response = await fetch('/api/validate-token', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!response.ok) return { valid: false };
+
+        const data = await response.json();
+        return {
+            valid: data.valid,
+            userId: data.userId
+        };
+    }
+
+    clearAuth() {
+        this.token = null;
+        this.isLoggedIn = false;
+        this.userId = null;
+        localStorage.removeItem('jwt');
     }
 
     setupCoreEvents() {
@@ -39,27 +170,19 @@ class GridManager {
 
         // Control Buttons
         if (!this.isSharedPage) { // to avoid overwrite local save
-            document.getElementById('save').addEventListener('click', () => this.saveStateToServer());
+            document.getElementById('save').addEventListener('click', () => this.saveState());
         }
-        
+
         this.deleteBtn = document.getElementById('deleteMode');
         this.deleteBtn.addEventListener('click', () => this.toggleDeleteMode());
 
         document.getElementById('loadDefault').addEventListener('click', () => this.loadDefaultProfile());
-        
-        // document.getElementById('addCharacter').addEventListener('click', () => this.addNewCharacter());
+
         document.getElementById('addCharacter').addEventListener('click', () => {
             sidebarManager.toggleSidebar();
         });
 
-        document.getElementById('share').addEventListener('click', () => this.shareGrid());
-        // document.querySelector('#importProfile input[type="file"]').addEventListener('change', async (e) => {
-        //     const file = e.target.files[0];
-        //     if (file) {
-        //         await this.importFromFile(file);
-        //         e.target.value = ''; // Reset input
-        //     }
-        // });
+        // document.getElementById('share').addEventListener('click', () => this.shareGrid());
 
         // Check marks
         this.grid.addEventListener('click', this.handleToggle.bind(this));
@@ -81,12 +204,13 @@ class GridManager {
                 el.parentNode.replaceChild(clone, el);
             }
         };
-        
+
         ['save', 'addCharacter', 'deleteMode', 'loadDefault'].forEach(cloneElement);
     }
 
     enableEditMode() {
         this.isEditable = true;
+        console.log("is editable now?", this.isEditable);
         this.setupControlButtons();
     }
 
@@ -103,7 +227,7 @@ class GridManager {
 
             const btn = document.querySelector('.import-btn');
             btn.classList.add('loading');
-            
+
             try {
                 const data = await this.parseImportFile(file);
                 await this.validateImportData(data);
@@ -117,7 +241,7 @@ class GridManager {
             }
         });
     }
-    
+
     parseImportFile(file) {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -143,16 +267,18 @@ class GridManager {
 
     async applyImport(data) {
         // Save to server
-        await fetch('/api/import', {
+        const response = await fetch('/api/import', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify(data)
         });
-        
-        // Reload grid
-        await this.loadState();
+
+        // Reload grid after confirmation
+        if (response.ok) {
+            await this.loadState();
+        }
     }
 
     showSuccess(message) {
@@ -201,41 +327,10 @@ class GridManager {
         console.log('GridManager state:', this.state);
     }
 
-    async loadDefaultProfile() {
-        // console.log("Loading default profile.");
-
-        try {
-            // Load data
-            const [profileRes] = await Promise.all([
-                fetch('/data/profiles/default.json')
-            ]);
-            
-            // ensure characters are loaded
-            if (!await this.ensureCharactersLoaded()) {
-                console.error("Interrupting loading default profile.");
-                return; // If characters are not loaded, exit early
-            }
-        
-            const profile = await profileRes.json();
-            // console.log("Loaded default layout:", profile.layout);
-
-            this.applyLayout(profile.layout);
-
-            this.state.layout = profile.layout;
-            this.state.marks = profile.marks;
-            this.applyState();
-        } catch (error) {
-            console.error('Error loading profile:', error);
-        }
-    }
-
-    async loadCharacterData() {
-        const response = await fetch('/api/characters');
-        const data = await response.json();
-        return data.characters;
-    }
-
     async loadCharacters() {
+        // console.log("loadCharacters");
+        this.loadingState.characters = true;
+
         try {
             const response = await fetch('/api/characters');
             const { characters } = await response.json();
@@ -244,20 +339,22 @@ class GridManager {
             this.characterMap = new Map(this.characters.map(c => [c.id, c]));
         } catch (error) {
             console.error('Error loading characters:', error);
+        } finally {
+            this.loadingState.characters = false;
         }
     }
 
     async ensureCharactersLoaded() {
         if (!this.characters || this.characters.length === 0 || !this.characterMap) {
             await this.loadCharacters(); // Ensure characters are loaded
-            console.log("onload", this.characterMap);
+            console.log("CharacterMap", this.characterMap);
         }
-    
+
         if (!this.characters || this.characters.length === 0 || !this.characterMap) {
             console.error("Characters could not be loaded.");
             return false; // Return false to signal failure
         }
-    
+
         return true; // Return true if characters are loaded
     }
 
@@ -286,7 +383,7 @@ class GridManager {
         const isActive = this.deleteBtn.classList.toggle('destruction-on');
         this.grid.classList.toggle('delete-mode', isActive);
         this.deleteBtn.textContent = isActive ? 'Cancel Delete' : 'Delete Mode';
-    
+
         // Add or remove click handler depending on the state
         if (isActive) {
             this.grid.addEventListener('click', this.handleDeleteBound);
@@ -294,7 +391,7 @@ class GridManager {
             this.grid.removeEventListener('click', this.handleDeleteBound);
         }
     }
-    
+
     handleDelete(e) {
         const cell = e.target.closest('.character-cell');
         if (cell) {
@@ -307,14 +404,14 @@ class GridManager {
         const cell = e.target.closest('.character-cell');
         if (cell) this.toggleCheckMark(cell);
     }
-    
+
     getDragAfterElement(horizontalPosition) {
         const draggableElements = [...this.grid.querySelectorAll('.character-cell:not(.dragging)')];
-        
+
         return draggableElements.reduce((closest, child) => {
             const box = child.getBoundingClientRect();
             const offset = horizontalPosition - box.left - box.width / 2;
-            
+
             if (offset < 0 && offset > closest.offset) {
                 return { offset: offset, element: child };
             } else {
@@ -328,16 +425,16 @@ class GridManager {
         const availableCharacters = this.characters.filter(c =>
             !this.state.layout.some(l => l === c.id)
         );
-    
+
         if (availableCharacters.length === 0) {
             console.warn("No available characters to add");
             return;
         }
-    
+
         // Pick random character
         const randomIndex = Math.floor(Math.random() * availableCharacters.length);
         const newChar = availableCharacters[randomIndex];
-    
+
         const cell = this.createCharacterCell(newChar);
         this.grid.appendChild(cell);
         this.state.layout.push(newChar.id);
@@ -353,7 +450,7 @@ class GridManager {
             this.saveState();
         }
     }
-    
+
     toggleCheckMark(cell) {
         const checkMark = cell.querySelector('.check-mark');
         checkMark.style.display = checkMark.style.display === 'none' ? 'block' : 'none';
@@ -363,19 +460,19 @@ class GridManager {
     showContextMenu(cell, x, y) {
         // Remove existing menus
         document.querySelectorAll('.context-menu').forEach(menu => menu.remove());
-        
+
         const menu = document.createElement('div');
         menu.className = 'context-menu';
         menu.style.left = `${x}px`;
         menu.style.top = `${y}px`;
-        
+
         menu.innerHTML = `
             <div class="context-item" onclick="gridManager.addCircle('${cell.dataset.id}')">Add Circle</div>
             <div class="context-item" onclick="gridManager.removeCircle('${cell.dataset.id}')">Remove Circle</div>
         `;
-        
+
         document.body.appendChild(menu);
-        
+
         // Close menu on click outside
         setTimeout(() => {
             document.addEventListener('click', () => menu.remove(), { once: true });
@@ -406,18 +503,49 @@ class GridManager {
         this.saveState();
     }
 
-    applyLayout() {
-        // Clear existing grid
-        this.grid.innerHTML = '';
-        
-        // Add unique characters in order
-        const uniqueIDs = [...new Set(this.state.layout)];
-        uniqueIDs.forEach(charId => {
-            if (this.characterMap.has(charId)) {
-                const cell = this.createCharacterCell(this.characterMap.get(charId));
-                this.grid.appendChild(cell);
+    async loadDefaultProfile() {
+        // console.log("Loading default profile.");
+
+        try {
+            // Load data
+            const [profileRes] = await Promise.all([
+                fetch('/default_profile')
+            ]);
+
+            // ensure characters are loaded
+            if (!await this.ensureCharactersLoaded()) {
+                console.error("Interrupting loading default profile.");
+                return; // If characters are not loaded, exit early
             }
-        });
+
+            const profile = await profileRes.json();
+            // console.log("Loaded default layout:", profile.layout);
+
+            this.applyLayout(profile.layout);
+
+            this.state.layout = profile.layout;
+            this.state.marks = profile.marks;
+        } catch (error) {
+            console.error('Error loading default profile:', error);
+        }
+    }
+
+    async loadProfile() {
+        if (!this.isLoggedIn)
+            throw new Error("Shouldn't have called loadProfile while not logged in!");
+
+        this.loadingState.profile = true;
+
+        try {
+            const response = await fetch('/api/profile', {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            this.state = await response.json();
+            this.applyLayout();
+        } finally {
+            this.loadingState.profile = false;
+        }
+
     }
 
     async loadState(externalState) {
@@ -427,36 +555,65 @@ class GridManager {
             console.log("Loading state from share id.");
             state = externalState;
         } else {
-            console.log("Loading state from cookies.");
+            console.log("Loading state from localStorage.");
 
-            const cookieState = document.cookie.match(/userState=([^;]+)/);
-            if (cookieState) {
-                state = JSON.parse(decodeURIComponent(cookieState[1]));
+            const localStorageState = localStorage.getItem('gridState');
+            if (localStorageState) {
+                state = JSON.parse(localStorageState);
             }
         }
-        
+
         if (state) {
             this.state = state;
             this.applyLayout();
-            this.applyState();
 
-            this.logState();
+            // console.log("state applied");
+            // this.logState();
         }
         else {
             console.error("Empty state.")
         }
-        
+
+    }
+
+    applyLayout() {
+        // Add visual placeholders first
+        this.grid.innerHTML = this.state.layout
+            .map(() => `<div class="cell-placeholder"></div>`)
+            .join('');
+
+        // Then populate with actual data
+        requestAnimationFrame(() => {
+            this.grid.innerHTML = '';
+
+            const uniqueIDs = [...new Set(this.state.layout)];
+            this.cellCache = new Map(); // Track created cells
+
+            uniqueIDs.forEach(charId => {
+                if (this.characterMap.has(charId)) {
+                    const character = this.characterMap.get(charId);
+                    const cell = this.createCharacterCell(character);
+                    this.cellCache.set(charId, cell); // Store reference
+                    this.grid.appendChild(cell);
+                }
+            });
+
+            this.applyState();
+        });
     }
 
     applyState() {
-        // Apply check marks and circles
         Object.entries(this.state.marks).forEach(([id, marks]) => {
-            const cell = this.grid.querySelector(`[data-id="${id}"]`);
-            if (cell) {
-                cell.querySelector('.check-mark').style.display = marks.checks ? 'block' : 'none';
+            const cell = this.cellCache.get(id); // Use cached cells
 
-                // Update circle visibility
+            if (cell) {
+                const checkMark = cell.querySelector('.check-mark');
                 const circles = cell.querySelectorAll('.circle');
+
+                // Apply check mark
+                checkMark.style.display = marks.checks ? 'block' : 'none';
+
+                // Apply circles
                 circles.forEach((circle, i) => {
                     if (i < marks.circles) {
                         circle.classList.add('show');  // Show circle
@@ -468,7 +625,7 @@ class GridManager {
         });
     }
 
-    async saveState() {
+    getCurrentState() {
         // Collect current state
         const state = {
             layout: [...this.grid.children].map(cell => cell.dataset.id),
@@ -485,38 +642,142 @@ class GridManager {
             };
         });
 
-        this.state = state;
+        return state;
     }
 
-    async saveStateToServer() {
-        // Save to cookie and server
-        await fetch('/api/save', {
+    async saveState() {
+        const state = this.getCurrentState();
+        // console.log("save state, shared?", this.isSharedPage, "logged in?", this.isLoggedIn);
+
+        // For shared pages in edit mode
+        if (this.isSharedPage && this.isEditable) {
+            return this.saveSharedState(state);
+        }
+
+        // Regular save flow
+        if (!this.isSharedPage) {
+            if (this.isLoggedIn) {
+                await this.saveToServer(state);
+            }
+            localStorage.setItem('gridState', JSON.stringify(state));
+            // console.log("Saved to local storage");
+        }
+    }
+
+    async saveToServer(state) {
+        if (this.isSharedPage && !this.isPersistentShare) {
+            await this.saveSnapshotToServer(state);
+            return;
+        }
+
+        const c_userId = (this.userId) ? this.userId : this.shareId;
+        // console.log("saving to server", c_userId);
+
+        const response = await fetch('/api/save', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${this.token}`
+            },
+            body: JSON.stringify({
+                state,
+                userId: c_userId
+            })
+        });
+
+        if (!response.ok) throw new Error('Save failed');
+    }
+
+    async saveSnapshotToServer(state) {
+        // console.log("saving snapshot to server", this.shareId, state);
+
+        const response = await fetch('/api/save-shared', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${this.token}`
+            },
+            body: JSON.stringify({
+                state,
+                snapshotId: this.shareId
+            })
+        });
+
+        if (!response.ok) throw new Error('Snapshot save failed');
+    }
+
+    async saveSharedState(state) {
+        if (this.isPersistentShare) {
+            // Save to original user's profile
+            await this.saveToServer(state);
+        } else {
+            // Save snapshot edits on server
+            await this.saveSnapshotToServer(state);
+        }
+    }
+
+    async createSnapshot(state) {
+        const response = await fetch('/api/share', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(this.state)
+            body: JSON.stringify(state)
         });
+        return response.json();
     }
-    
-    async shareGrid(mode = 'readwrite') {
+
+    async shareSnapshot(state, editable) {
+        const { shareId } = await this.createSnapshot(state);
+        return `${window.location.origin}/shared/${shareId}${editable ? '?edit=true' : ''}`;
+    }
+
+    async sharePersistent(editable) {
+        if (!this.isSharedPage) {
+            return `${window.location.origin}/shared/user/${this.userId}${editable ? '?edit=true' : ''}`;
+        
+        } else if (this.isPersistentShare) {
+            return `${window.location.origin}/shared/user/${this.shareId}${(editable && this.isEditable) ? '?edit=true' : ''}`;
+        
+        } else {
+            return `${window.location.origin}/shared/${this.shareId}${(editable && this.isEditable) ? '?edit=true' : ''}`;
+        }
+    }
+
+    updateSharedUrl(newShareId) {
+        const newUrl = `/shared/${newShareId}${this.isEditable ? '?edit=true' : ''}`;
+        window.history.replaceState({}, '', newUrl);
+        this.shareId = newShareId;
+    }
+
+    async shareGrid() {
+        console.log("share button pressed");
         const state = this.state;
+
         try {
-            const response = await fetch('/api/share', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ state, mode })
-            });
-            const { shareId } = await response.json();
-            this.showShareDialog(shareId, mode);
+            let baseUrl;
+            if (this.isLoggedIn) {
+                baseUrl = `${window.location.origin}/shared/user/${this.userId}`;
+            }
+            else {
+                const response = await fetch('/api/share', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ state })
+                });
+                const { shareId } = await response.json();
+                baseUrl = `${window.location.origin}/shared/${shareId}`;
+            }
+
+            this.showShareDialog(baseUrl);
+
         } catch (error) {
             console.error('Sharing failed:', error);
         }
     }
 
-    showShareDialog(shareId, mode) {
-        const baseUrl = `${window.location.origin}/share/${shareId}`;
-        const readWriteUrl = `${baseUrl}?edit=true`;
-        const readOnlyUrl = `${baseUrl}`;
-        
+    showShareDialog(shareUrl) {
+        const readWriteUrl = `${shareUrl}?edit=true`;
+        const readOnlyUrl = `${shareUrl}`;
+
         const dialog = document.createElement('div');
         dialog.className = 'share-dialog';
         dialog.innerHTML = `
@@ -568,10 +829,16 @@ class GridManager {
 }
 
 // Initialize with share manager
-window.onload = () => {
+document.addEventListener('DOMContentLoaded', async () => {
     window.gridManager = new GridManager();
-    if (window.location.pathname.startsWith('/share')) {
-        new ShareManager(window.gridManager);
+
+    try {
+        await gridManager.initializeAuth(); // Critical auth check
+        await gridManager.initialize();
+
+    } catch (error) {
+        console.error('Initialization error:', error);
+        gridManager.showError('Failed to load data');
     }
     sidebarManager = new SidebarManager(window.gridManager);
 
@@ -581,8 +848,8 @@ window.onload = () => {
         overlay.className = 'loading-overlay';
         overlay.textContent = 'Loading Default Profile...';
         document.body.appendChild(overlay);
-    
+
         await window.gridManager.loadDefaultProfile();
         overlay.remove();
     });
-};
+});
