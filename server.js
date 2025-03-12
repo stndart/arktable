@@ -40,11 +40,17 @@ const watcher = chokidar.watch(CHAR_DATA_FILE, {
 });
 
 watcher.on('change', () => {
-    // console.log("Detected char data file change");
+    console.log("Detected char data file change");
+    reload_chars();
+});
+
+function reload_chars() {
+    // console.log("Reloaded chars");
     delete require.cache[require.resolve(CHAR_DATA_FILE)];
     charData = require(CHAR_DATA_FILE);
     validCharIds = new Set(charData.characters.map(char => char.id));
-});
+}
+
 
 const USERS_FILE = path.join(DATA_PATH, 'users.json');
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -425,6 +431,7 @@ app.post('/admin/add', upload.single('image'), async (req, res) => {
     // Add new character and update metadata
     data.characters.push(newChar);
     await fs.writeFile(CHAR_DATA_FILE, JSON.stringify(data, null, 4));
+    reload_chars();
 
     console.log(CHAR_DATA_FILE);
     console.log(JSON.stringify(data));
@@ -538,6 +545,7 @@ app.post('/admin/update-file', adminAuth, async (req, res) => {
         }
 
         await fs.writeFile(CHAR_DATA_FILE, JSON.stringify(data, null, 2));
+        reload_chars();
         res.json({ success: true, newFilename });
     } catch (error) {
         console.log("Error updating file", error);
