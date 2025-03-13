@@ -77,6 +77,7 @@ async function getUsers() {
 async function saveUser(user) {
     const users = await getUsers();
     users.push(user);
+    await fs.truncate(USERS_FILE, 0);
     await fs.writeFile(USERS_FILE, JSON.stringify(users));
     const profile_path = path.join(PROFILE_DIR, `${user.id}.json`);
     await fs.copyFile(DEFAULT_PROFILE_PATH, profile_path);
@@ -125,6 +126,7 @@ async function init() {
     await fs.mkdir(DATA_PATH, { recursive: true });
     await fs.mkdir(SHARED_DIR, { recursive: true });
     if (!await fileExists(CHAR_DATA_FILE)) {
+        await fs.truncate(CHAR_DATA_FILE, 0);
         await fs.writeFile(CHAR_DATA_FILE, JSON.stringify({ characters: [] }));
     }
 
@@ -132,6 +134,7 @@ async function init() {
     const PROFILE_FILE = path.join(DATA_PATH, 'profiles/default.json');
     if (!await fileExists(PROFILE_FILE)) {
         await fs.mkdir(path.dirname(PROFILE_FILE), { recursive: true });
+        await fs.truncate(PROFILE_FILE, 0);
         await fs.writeFile(PROFILE_FILE, JSON.stringify({
             layout: ["wisadel", "schwarz"],
             marks: {
@@ -322,9 +325,11 @@ app.post('/api/save', async (req, res) => { // security disabled for now
     try {
         const { state, userId } = req.body;
         const profilePath = path.join(PROFILE_DIR, `${userId}.json`);
+        await fs.truncate(profilePath, 0);
+        // console.log(JSON.stringify(state));
         await fs.writeFile(profilePath, JSON.stringify(state));
         res.json({ success: true });
-    
+
     } catch (error) {
         res.status(500).json({ error: 'Save failed' });
         console.log('Save failed', error);
@@ -338,9 +343,10 @@ app.post('/api/save-shared', async (req, res) => {
         const shareId = snapshotId ? snapshotId : uuidv4();
         const filePath = path.join(SHARED_DIR, `${shareId}.json`);
 
+        await fs.truncate(filePath, 0);
         await fs.writeFile(filePath, JSON.stringify(state));
         res.json({ shareId });
-    
+
     } catch (error) {
         res.status(500).json({ error: 'Shared save failed' });
         console.log('Shared save failed', error);
@@ -351,6 +357,7 @@ app.post('/api/share', async (req, res) => {
     const shareId = uuidv4();
     const filePath = path.join(SHARED_DIR, `${shareId}.json`);
 
+    await fs.truncate(filePath, 0);
     await fs.writeFile(filePath, JSON.stringify({
         ...req.body,
         meta: {
@@ -430,6 +437,7 @@ app.post('/admin/add', upload.single('image'), async (req, res) => {
 
     // Add new character and update metadata
     data.characters.push(newChar);
+    await fs.truncate(CHAR_DATA_FILE, 0);
     await fs.writeFile(CHAR_DATA_FILE, JSON.stringify(data, null, 4));
     reload_chars();
 
@@ -462,6 +470,7 @@ app.post('/admin/remove-index', adminAuth, async (req, res) => {
             });
         }
 
+        await fs.truncate(metaPath, 0);
         await fs.writeFile(metaPath, JSON.stringify(data, null, 2));
         res.json({ success: true });
     } catch (error) {
@@ -543,7 +552,8 @@ app.post('/admin/update-file', adminAuth, async (req, res) => {
         } else {
             data.characters.push(newCharacter);
         }
-
+        
+        await fs.truncate(CHAR_DATA_FILE, 0);
         await fs.writeFile(CHAR_DATA_FILE, JSON.stringify(data, null, 2));
         reload_chars();
         res.json({ success: true, newFilename });
@@ -565,6 +575,7 @@ app.delete('/admin/delete-file', adminAuth, async (req, res) => {
         const metaPath = path.join(__dirname, 'public/data/characters.json');
         const data = require(metaPath);
         data.characters = data.characters.filter(c => c.image !== filename);
+        await fs.truncate(metaPath, 0);
         await fs.writeFile(metaPath, JSON.stringify(data, null, 2));
 
         res.json({ success: true });

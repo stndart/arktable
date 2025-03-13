@@ -44,6 +44,7 @@ class GridManager {
         this.characterMap = new Map();
 
         this.handleDeleteBound = this.handleDelete.bind(this); // Store bound function once
+        this.handleToggleBound = this.handleToggle.bind(this); // Store bound function once
 
         if (this.isEditable) {
             this.setupCoreEvents();
@@ -185,7 +186,7 @@ class GridManager {
         // document.getElementById('share').addEventListener('click', () => this.shareGrid());
 
         // Check marks
-        this.grid.addEventListener('click', this.handleToggle.bind(this));
+        this.grid.addEventListener('click', this.handleToggleBound);
 
         // Right-click context menu
         this.grid.addEventListener('contextmenu', e => {
@@ -454,9 +455,11 @@ class GridManager {
 
         // Add or remove click handler depending on the state
         if (isActive) {
+            this.grid.removeEventListener('click', this.handleToggleBound);
             this.grid.addEventListener('click', this.handleDeleteBound);
         } else {
             this.grid.removeEventListener('click', this.handleDeleteBound);
+            this.grid.addEventListener('click', this.handleToggleBound);
         }
     }
 
@@ -471,27 +474,6 @@ class GridManager {
     handleToggle(e) {
         const cell = e.target.closest('.character-cell');
         if (cell) this.toggleCheckMark(cell);
-    }
-
-    async addNewCharacter() {
-        // Filter out characters already in layout
-        const availableCharacters = this.characters.filter(c =>
-            !this.state.layout.some(l => l === c.id)
-        );
-
-        if (availableCharacters.length === 0) {
-            console.warn("No available characters to add");
-            return;
-        }
-
-        // Pick random character
-        const randomIndex = Math.floor(Math.random() * availableCharacters.length);
-        const newChar = availableCharacters[randomIndex];
-
-        const cell = this.createCharacterCell(newChar);
-        this.grid.appendChild(cell);
-        this.state.layout.push(newChar.id);
-        await this.saveState();
     }
 
     addCharacterById(charId) {
@@ -673,7 +655,7 @@ class GridManager {
 
     async saveState() {
         const state = this.getCurrentState();
-        // console.log("save state, shared?", this.isSharedPage, "logged in?", this.isLoggedIn);
+        console.log("save state, shared?", this.isSharedPage, "logged in?", this.isLoggedIn);
 
         // For shared pages in edit mode
         if (this.isSharedPage && this.isEditable) {
@@ -691,6 +673,8 @@ class GridManager {
     }
 
     async saveToServer(state) {
+        console.log('save to server')
+
         if (this.isSharedPage && !this.isPersistentShare) {
             await this.saveSnapshotToServer(state);
             return;
