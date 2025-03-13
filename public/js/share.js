@@ -109,13 +109,14 @@ class ShareManager {
             btn.style.display = 'none';
         });
         document.getElementById('share').style.display = 'block';
+        document.getElementById('exportBtn').style.display = 'block';
 
         document.getElementById('shareModeInfo').textContent =
             `${this.gridManager.isEditable ? 'Editable' : 'Read-Only'} • Shared ${new Date().toISOString().split('T')[0]}`;
 
 
         // Show controls if editable
-        ['addCharacter', 'deleteMode', 'loadDefault'].forEach(id => {
+        ['addCharacter', 'deleteMode'].forEach(id => {
             document.getElementById(id).style.display = this.gridManager.isEditable ? '' : 'none';
         });
 

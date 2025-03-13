@@ -176,7 +176,7 @@ class GridManager {
         this.deleteBtn = document.getElementById('deleteMode');
         this.deleteBtn.addEventListener('click', () => this.toggleDeleteMode());
 
-        document.getElementById('loadDefault').addEventListener('click', () => this.loadDefaultProfile());
+        document.getElementById('exportBtn').addEventListener('click', () => this.exportToFile());
 
         document.getElementById('addCharacter').addEventListener('click', () => {
             sidebarManager.toggleSidebar();
@@ -205,7 +205,7 @@ class GridManager {
             }
         };
 
-        ['save', 'addCharacter', 'deleteMode', 'loadDefault'].forEach(cloneElement);
+        ['save', 'addCharacter', 'deleteMode', 'exportBtn'].forEach(cloneElement);
     }
 
     enableEditMode() {
@@ -556,33 +556,6 @@ class GridManager {
         this.saveState();
     }
 
-    async loadDefaultProfile() {
-        // console.log("Loading default profile.");
-
-        try {
-            // Load data
-            const [profileRes] = await Promise.all([
-                fetch('/default_profile')
-            ]);
-
-            // ensure characters are loaded
-            if (!await this.ensureCharactersLoaded()) {
-                console.error("Interrupting loading default profile.");
-                return; // If characters are not loaded, exit early
-            }
-
-            const profile = await profileRes.json();
-            // console.log("Loaded default layout:", profile.layout);
-
-            this.applyLayout(profile.layout);
-
-            this.state.layout = profile.layout;
-            this.state.marks = profile.marks;
-        } catch (error) {
-            console.error('Error loading default profile:', error);
-        }
-    }
-
     async loadProfile() {
         if (!this.isLoggedIn)
             throw new Error("Shouldn't have called loadProfile while not logged in!");
@@ -723,7 +696,7 @@ class GridManager {
             return;
         }
 
-        const c_userId = (this.userId) ? this.userId : this.shareId;
+        const c_userId = (this.isSharedPage) ? this.shareId : this.userId;
         // console.log("saving to server", c_userId);
 
         const response = await fetch('/api/save', {
@@ -894,15 +867,4 @@ document.addEventListener('DOMContentLoaded', async () => {
         gridManager.showError('Failed to load data');
     }
     sidebarManager = new SidebarManager(window.gridManager);
-
-    // Add profile loading button handler
-    document.getElementById('loadDefault').addEventListener('click', async () => {
-        const overlay = document.createElement('div');
-        overlay.className = 'loading-overlay';
-        overlay.textContent = 'Loading Default Profile...';
-        document.body.appendChild(overlay);
-
-        await window.gridManager.loadDefaultProfile();
-        overlay.remove();
-    });
 });

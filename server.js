@@ -133,9 +133,9 @@ async function init() {
     if (!await fileExists(PROFILE_FILE)) {
         await fs.mkdir(path.dirname(PROFILE_FILE), { recursive: true });
         await fs.writeFile(PROFILE_FILE, JSON.stringify({
-            layout: ["wizadel", "schwarz"],
+            layout: ["wisadel", "schwarz"],
             marks: {
-                "wizadel": { checks: true, circles: 2 },
+                "wisadel": { checks: true, circles: 2 },
                 "schwarz": { checks: false, circles: 0 }
             }
         }));

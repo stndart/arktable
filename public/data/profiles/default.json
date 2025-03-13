@@ -1,7 +1,7 @@
 {
-    "layout": ["wizadel", "schwarz"],
+    "layout": ["wisadel", "schwarz"],
     "marks": {
-        "wizadel": { "checks": true, "circles": 2 },
+        "wisadel": { "checks": true, "circles": 2 },
         "schwarz": { "checks": false, "circles": 0 }
     }
 }
