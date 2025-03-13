@@ -7,7 +7,7 @@ class GridManager {
         this.isSharedPage = window.location.pathname.startsWith('/shared/');
         this.isPersistentShare = window.location.pathname.startsWith('/shared/user/');
         this.shareId = this.getShareIdFromURL();
-        
+
         this.isEditable = !this.isSharedPage;
         if (this.isSharedPage) {
             const params = new URLSearchParams(window.location.search);
@@ -300,14 +300,18 @@ class GridManager {
     handleDragOver(e) {
         e.preventDefault();
         if (!this.dragSrcElement) return;
-    
+
         const afterElement = this.getDragAfterElement(e.clientX, e.clientY);
-        const gridRect = this.grid.getBoundingClientRect();
-        
+
+        // this.grid.querySelectorAll('.character-cell:not(.dragging)').forEach(cell => {
+        //     cell.style.opacity = 1;
+        // });
+        // afterElement.style.opacity = 0.1;
+
         if (afterElement) {
             // Get bounding rect of the potential sibling
             const afterElementRect = afterElement.getBoundingClientRect();
-            
+
             // Determine insert position based on mouse position
             if (e.clientX < afterElementRect.left + afterElementRect.width / 2) {
                 this.grid.insertBefore(this.dragSrcElement, afterElement);
@@ -323,32 +327,41 @@ class GridManager {
     handleDragEnd(e) {
         this.dragSrcElement?.classList.remove('dragging');
         this.dragSrcElement = null;
+
+        // this.grid.querySelectorAll('.character-cell:not(.dragging)').forEach(cell => {
+        //     cell.style.opacity = 1;
+        // });
+
         this.saveState();
+    }
+
+    calcOffset(box, x, y) {
+        const centerX = box.left + box.width / 2;
+        const centerY = box.top + box.height / 2;
+
+        // Calculate distance from mouse to element center
+        const offsetX = x - centerX;
+        const offsetY = y - centerY;
+        return { offsetX, offsetY };
     }
 
     getDragAfterElement(x, y) {
         const draggableElements = [...this.grid.querySelectorAll('.character-cell:not(.dragging)')];
-        
+
         // Sort elements by their visual position (top -> bottom, left -> right)
         const sortedElements = draggableElements.sort((a, b) => {
             const aRect = a.getBoundingClientRect();
             const bRect = b.getBoundingClientRect();
             return aRect.top - bRect.top || aRect.left - bRect.left;
         });
-    
-        return sortedElements.reduce((closest, child) => {
-            const box = child.getBoundingClientRect();
-            const centerX = box.left + box.width / 2;
-            const centerY = box.top + box.height / 2;
-            
-            // Calculate distance from mouse to element center
-            const offsetX = x - centerX;
-            const offsetY = y - centerY;
+
+        const closest_row = sortedElements.reduce((closest, child) => {
+            const { offsetX, offsetY } = this.calcOffset(child.getBoundingClientRect(), x, y);
             const distance = Math.sqrt(offsetX ** 2 + offsetY ** 2);
-    
-            // Check if closer than previous closest
-            if (distance < closest.distance) {
-                return { 
+            
+            const better_Y = (Math.abs(offsetY) == Math.abs(closest.offsetY)) ? (offsetY <= closest.offsetY) : (Math.abs(offsetY) <= Math.abs(closest.offsetY));
+            if (better_Y) {
+                return {
                     distance: distance,
                     element: child,
                     offsetX: offsetX,
@@ -356,7 +369,26 @@ class GridManager {
                 };
             }
             return closest;
-        }, { distance: Infinity, element: null, offsetX: 0, offsetY: 0 }).element;
+        }, { distance: Infinity, element: null, offsetX: Infinity, offsetY: Infinity });
+
+        if (closest_row.offsetY > closest_row.element.getBoundingClientRect().height / 2) {
+            return sortedElements[-1];
+        }
+
+        return sortedElements.reduce((closest, child) => {
+            const { offsetX, offsetY } = this.calcOffset(child.getBoundingClientRect(), x, y);
+            const distance = Math.sqrt(offsetX ** 2 + offsetY ** 2);
+
+            if (offsetY == closest.offsetY && distance < closest.distance) { // Check if closer than previous closest
+                return {
+                    distance: distance,
+                    element: child,
+                    offsetX: offsetX,
+                    offsetY: offsetY
+                };
+            }
+            return closest;
+        }, closest_row).element;
     }
 
     logState() {
@@ -754,10 +786,10 @@ class GridManager {
     async sharePersistent(editable) {
         if (!this.isSharedPage) {
             return `${window.location.origin}/shared/user/${this.userId}${editable ? '?edit=true' : ''}`;
-        
+
         } else if (this.isPersistentShare) {
             return `${window.location.origin}/shared/user/${this.shareId}${(editable && this.isEditable) ? '?edit=true' : ''}`;
-        
+
         } else {
             return `${window.location.origin}/shared/${this.shareId}${(editable && this.isEditable) ? '?edit=true' : ''}`;
         }
