@@ -16,9 +16,10 @@ body {
 .grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    gap: 10px;
+    /* grid-template-rows: repeat(auto-fill, minmax(120px, 1fr)); */
+    gap: 5px;
     align-items: start;
-    padding: 20px;
+    padding: 5px;
     background: white;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -361,8 +362,8 @@ button:hover,
 .sidebar-container {
     position: fixed;
     top: 0;
-    right: -600px;
-    width: 600px;
+    right: -40vw;
+    width: 40vw;
     height: 100vh;
     background: white;
     box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
@@ -406,9 +407,9 @@ button:hover,
 .sidebar-grid {
     flex: 1;
     overflow-y: auto;
-    padding: 15px;
+    padding: 1px;
     display: grid;
-    gap: 15px;
+    gap: 1px;
     grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
     grid-auto-rows: min-content;
 }
