@@ -300,11 +300,22 @@ class GridManager {
     handleDragOver(e) {
         e.preventDefault();
         if (!this.dragSrcElement) return;
-
-        const afterElement = this.getDragAfterElement(e.clientX);
+    
+        const afterElement = this.getDragAfterElement(e.clientX, e.clientY);
+        const gridRect = this.grid.getBoundingClientRect();
+        
         if (afterElement) {
-            this.grid.insertBefore(this.dragSrcElement, afterElement);
+            // Get bounding rect of the potential sibling
+            const afterElementRect = afterElement.getBoundingClientRect();
+            
+            // Determine insert position based on mouse position
+            if (e.clientX < afterElementRect.left + afterElementRect.width / 2) {
+                this.grid.insertBefore(this.dragSrcElement, afterElement);
+            } else {
+                this.grid.insertBefore(this.dragSrcElement, afterElement.nextSibling);
+            }
         } else {
+            // Add to end of grid
             this.grid.appendChild(this.dragSrcElement);
         }
     }
@@ -313,6 +324,39 @@ class GridManager {
         this.dragSrcElement?.classList.remove('dragging');
         this.dragSrcElement = null;
         this.saveState();
+    }
+
+    getDragAfterElement(x, y) {
+        const draggableElements = [...this.grid.querySelectorAll('.character-cell:not(.dragging)')];
+        
+        // Sort elements by their visual position (top -> bottom, left -> right)
+        const sortedElements = draggableElements.sort((a, b) => {
+            const aRect = a.getBoundingClientRect();
+            const bRect = b.getBoundingClientRect();
+            return aRect.top - bRect.top || aRect.left - bRect.left;
+        });
+    
+        return sortedElements.reduce((closest, child) => {
+            const box = child.getBoundingClientRect();
+            const centerX = box.left + box.width / 2;
+            const centerY = box.top + box.height / 2;
+            
+            // Calculate distance from mouse to element center
+            const offsetX = x - centerX;
+            const offsetY = y - centerY;
+            const distance = Math.sqrt(offsetX ** 2 + offsetY ** 2);
+    
+            // Check if closer than previous closest
+            if (distance < closest.distance) {
+                return { 
+                    distance: distance,
+                    element: child,
+                    offsetX: offsetX,
+                    offsetY: offsetY
+                };
+            }
+            return closest;
+        }, { distance: Infinity, element: null, offsetX: 0, offsetY: 0 }).element;
     }
 
     logState() {
@@ -395,21 +439,6 @@ class GridManager {
     handleToggle(e) {
         const cell = e.target.closest('.character-cell');
         if (cell) this.toggleCheckMark(cell);
-    }
-
-    getDragAfterElement(horizontalPosition) {
-        const draggableElements = [...this.grid.querySelectorAll('.character-cell:not(.dragging)')];
-
-        return draggableElements.reduce((closest, child) => {
-            const box = child.getBoundingClientRect();
-            const offset = horizontalPosition - box.left - box.width / 2;
-
-            if (offset < 0 && offset > closest.offset) {
-                return { offset: offset, element: child };
-            } else {
-                return closest;
-            }
-        }, { offset: Number.NEGATIVE_INFINITY }).element;
     }
 
     async addNewCharacter() {
