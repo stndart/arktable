@@ -14,10 +14,6 @@ const { userInfo } = require('os');
 const uuidv4 = require('uuid').v4;
 
 const app = express();
-const upload = multer({
-    dest: 'public/characters/temp/',
-    limits: { fileSize: 500000 } // 500KB
-});
 
 // Configuration
 const DATA_PATH = path.join(__dirname, '/data');
@@ -25,14 +21,16 @@ const SHARED_DIR = path.join(DATA_PATH, 'shared');
 const PROFILE_DIR = path.join(DATA_PATH, 'profiles');
 
 const PUBLIC_DATA_PATH = path.join(__dirname, 'public/data')
-const CHARACTERS_DIR = path.join(__dirname, 'public/characters');
+const CHARACTERS_DIR = path.join(__dirname, 'data/characters');
 const SUBCLASSES_FILE = path.join(PUBLIC_DATA_PATH, 'classes.json');
 const CHAR_DATA_FILE = path.join(PUBLIC_DATA_PATH, 'characters.json');
-// function getValidCharIds() {
-//     return new Set(require(CHAR_DATA_FILE).characters.map(char => char.id));
-// }
 let charData = require(CHAR_DATA_FILE);
 let validCharIds = new Set(charData.characters.map(char => char.id));
+
+const upload = multer({
+    dest: path.join(CHARACTERS_DIR, 'temp/'),
+    limits: { fileSize: 500000 } // 500KB
+});
 
 const watcher = chokidar.watch(CHAR_DATA_FILE, {
     persistent: true,
@@ -55,7 +53,7 @@ function reload_chars() {
 const USERS_FILE = path.join(DATA_PATH, 'users.json');
 const JWT_SECRET = process.env.JWT_SECRET;
 
-const DEFAULT_PROFILE_PATH = path.join('public/data/profiles/default.json');
+const DEFAULT_PROFILE_PATH = path.join('data/profiles/default.json');
 
 if (!JWT_SECRET) {
     console.error('FATAL: JWT_SECRET not defined!');
@@ -67,7 +65,7 @@ app.use(express.json());
 app.use(cookieParser());
 app.use(express.static('public'));
 app.use('/default_profile', express.static(DEFAULT_PROFILE_PATH));
-app.use('/characters', express.static(path.join(__dirname, 'public/characters')));
+app.use('/characters', express.static(CHARACTERS_DIR));
 
 // User storage helper
 async function getUsers() {
