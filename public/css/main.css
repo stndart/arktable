@@ -32,6 +32,11 @@ body {
         margin: 0 auto;
     }
 }
+@media (max-width: 480px) {
+    .grid {
+		grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+    }
+}
 
 /* Checkered Pattern */
 .character-cell:nth-child(even) {
@@ -432,9 +437,9 @@ button:hover,
 (orientation: portrait) {
     .sidebar-container {
         width: 100%;
-        height: 50vh;
+        height: 70vh;
         right: 0;
-        bottom: -50vh;
+        bottom: -70vh;
         top: auto;
         transition: bottom 0.3s ease;
     }
