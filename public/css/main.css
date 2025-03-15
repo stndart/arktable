@@ -46,7 +46,6 @@ body {
     overflow: hidden;
     border: 2px solid #ddd;
     border-radius: 8px;
-    padding: 10px;
     transition: transform 0.3s ease, opacity 0.2s ease;
     will-change: transform;
 }
@@ -65,7 +64,7 @@ body {
 
 /* Character Image */
 .character-image {
-    position: relative;
+    position: absolute;
     top: 0;
     left: 0;
     width: 100%;
