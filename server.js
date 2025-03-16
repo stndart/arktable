@@ -79,6 +79,8 @@ async function saveUser(user) {
     await fs.writeFile(USERS_FILE, JSON.stringify(users));
     const profile_path = path.join(PROFILE_DIR, `${user.id}.json`);
     await fs.copyFile(DEFAULT_PROFILE_PATH, profile_path);
+
+    console.log(`Registered user: email ${user.email}`);
 }
 
 const adminAuth = (req, res, next) => {
@@ -254,8 +256,10 @@ app.post('/api/register', async (req, res) => {
 });
 
 app.post('/api/login', async (req, res) => {
+    let wemail = "";
     try {
         const { email, password } = req.body;
+        wemail = email;
         const users = await getUsers();
         const user = users.find(u => u.email === email);
 
@@ -263,12 +267,14 @@ app.post('/api/login', async (req, res) => {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
+        console.log(`Login to email ${wemail} successfull`);
+
         const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
         res.json({ token });
 
     } catch (error) {
         res.status(500).json({ error: 'Login failed' });
-        console.error("Login failed", error);
+        console.error(`Login to email ${wemail} failed`, error);
     }
 });
 
