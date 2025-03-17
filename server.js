@@ -433,7 +433,7 @@ app.post('/admin/add', upload.single('image'), async (req, res) => {
     };
 
     // Move and rename uploaded file
-    const finalPath = path.join(__dirname, 'public/characters', newChar.image);
+    const finalPath = path.join(CHARACTERS_DIR, newChar.image);
     await fs.rename(req.file.path, finalPath);
 
     console.log(req.file.path);
@@ -486,7 +486,7 @@ app.post('/admin/remove-index', adminAuth, async (req, res) => {
 app.get('/admin/files', adminAuth, async (req, res) => {
     try {
         const files = await fs.readdir(CHARACTERS_DIR);
-        const metadata = require('./public/data/characters.json').characters;
+        const metadata = require(CHAR_DATA_FILE).characters;
 
         const fileData = await Promise.all(files.map(async (file) => {
             if (!file.endsWith('.png')) return null;
@@ -532,12 +532,11 @@ app.post('/admin/update-file', adminAuth, async (req, res) => {
         // }
 
         const newFilename = `${id}.png`;
-        const charactersPath = path.join(__dirname, 'public/characters');
 
         // Rename file
         await fs.rename(
-            path.join(charactersPath, originalFile),
-            path.join(charactersPath, newFilename)
+            path.join(CHARACTERS_DIR, originalFile),
+            path.join(CHARACTERS_DIR, newFilename)
         );
 
         // Update metadata
@@ -572,15 +571,14 @@ app.delete('/admin/delete-file', adminAuth, async (req, res) => {
     const { filename } = req.body;
 
     try {
-        const filePath = path.join(__dirname, 'public/characters', filename);
+        const filePath = path.join(CHARACTERS_DIR, filename);
         await fs.unlink(filePath);
 
         // Remove from metadata
-        const metaPath = path.join(__dirname, 'public/data/characters.json');
-        const data = require(metaPath);
+        const data = require(CHAR_DATA_FILE);
         data.characters = data.characters.filter(c => c.image !== filename);
-        await fs.truncate(metaPath, 0);
-        await fs.writeFile(metaPath, JSON.stringify(data, null, 2));
+        await fs.truncate(CHAR_DATA_FILE, 0);
+        await fs.writeFile(CHAR_DATA_FILE, JSON.stringify(data, null, 2));
 
         res.json({ success: true });
     } catch (error) {
