@@ -56,9 +56,17 @@ class FileManager {
         // Get token from URL
         const urlParams = new URLSearchParams(window.location.search);
         this.adminToken = urlParams.get('token');
-        
+
         this.subclasses = {};
         this.loadSubclasses();
+
+        // Add original files reference
+        this.originalFiles = [];
+
+        // Initialize filter manager after loading files
+        this.loadFiles().then(() => {
+            this.filterManager = new FilterManager(this);
+        });
 
         this.fileGrid = document.getElementById('fileGrid');
         this.editModal = document.getElementById('editModal');
@@ -142,15 +150,9 @@ class FileManager {
             url.searchParams.set('token', new URLSearchParams(window.location.search).get('token'));
 
             const response = await fetch(url);
-            let files = await response.json();
-
-            if (filter !== 'all') {
-                files = files.filter(f =>
-                    filter === 'indexed' ? f.indexed : !f.indexed
-                );
-            }
-
-            this.renderFiles(files);
+            // let files = await response.json();
+            this.originalFiles = await response.json();
+            this.filterManager?.applyFilters();
         } catch (error) {
             console.error('Failed to load files:', error);
         }
@@ -203,7 +205,7 @@ class FileManager {
         document.getElementById('charName').value = file?.metadata?.name || '';
         document.getElementById('charClass').value = file?.metadata?.class || '';
         document.getElementById('charRarity').value = file?.metadata?.rarity?.toString() || '4';
-        
+
         this.setupClassSubclassBinding();
         this.updateSubclassOptions(file?.metadata?.class);
         document.getElementById('charSubclass').value = file?.metadata?.subclass || '';
@@ -221,7 +223,7 @@ class FileManager {
     updateSubclassOptions(className) {
         const subclassSelect = document.getElementById('charSubclass');
         subclassSelect.innerHTML = '';
-        
+
         if (this.subclasses[className]) {
             this.subclasses[className].forEach(subclass => {
                 const option = document.createElement('option');
@@ -383,10 +385,273 @@ class FileManager {
     }
 }
 
+class FilterManager {
+    constructor(fileManager) {
+        this.fileManager = fileManager;
+        this.filters = {
+            class: { state: 'neutral', values: [] },
+            rarity: { state: 'neutral', values: [] },
+            indexed: { state: 'neutral', values: [] },
+            // Will populate extra filters from metadata
+        };
+
+        this.lastScrollPos = 0;
+        this.initFilters();
+        this.loadFilterState();
+        this.setupScrollBehavior();
+    }
+
+    initFilters() {
+        this.setupCoreFilters();
+        this.setupFilterEvents();
+        this.setupSearch();
+        this.setupStatePersistence();
+    }
+
+    setupCoreFilters() {
+        // Class filter
+        this.createFilterOptions('class', ['Caster', 'Defender', 'Guard', 'Medic', 'Sniper', 'Specialist', 'Supporter', 'Vanguard']);
+
+        // Rarity filter
+        this.createFilterOptions('rarity', ['4', '5', '6']);
+
+        // Indexed filter
+        this.createFilterOptions('indexed', ['indexed', 'unindexed']);
+
+        // Extra filters
+        // TODO
+    }
+
+    createFilterOptions(filterName, values) {
+        const container = document.getElementById('extraFilters');
+        values.forEach(value => {
+            const option = document.createElement('div');
+            option.className = 'filter-option';
+            option.dataset.filter = filterName;
+            option.dataset.value = value;
+            option.textContent = filterName + ": " + value;
+            container.appendChild(option);
+        });
+    }
+
+    setupFilterEvents() {
+        // Toggle filter states
+        document.querySelectorAll('.filter-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                if (e.target.classList.contains('filter-toggle')) return;
+
+                const filterName = item.dataset.filter;
+                const currentState = item.dataset.state;
+                const newState = this.getNextState(currentState);
+
+                this.updateFilterState(filterName, newState);
+                this.renderFilterState(item, newState);
+            });
+        });
+
+        // Handle dropdown filter selection
+        // document.getElementById('extraFilters').addEventListener('click', (e) => {
+        //     const option = e.target.closest('.filter-option');
+        //     if (!option) return;
+
+        //     const filterName = option.dataset.filter;
+        //     const value = option.dataset.value;
+        //     this.toggleFilterValue(filterName, value);
+        //     this.applyFilters();
+        // });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.filter-dropdown')) {
+                document.getElementById('extraFilters').classList.remove('active');
+            }
+        });
+    }
+
+    getNextState(currentState) {
+        const states = ['neutral', 'forced', 'discarded'];
+        const currentIndex = states.indexOf(currentState);
+        return states[(currentIndex + 1) % states.length];
+    }
+
+    updateFilterState(filterName, newState) {
+        this.filters[filterName].state = newState;
+        if (newState === 'neutral') {
+            this.filters[filterName].values = [];
+        }
+        this.applyFilters();
+        this.saveFilterState();
+    }
+
+    toggleFilterValue(filterName, value) {
+        const index = this.filters[filterName].values.indexOf(value);
+        if (index === -1) {
+            this.filters[filterName].values.push(value);
+        } else {
+            this.filters[filterName].values.splice(index, 1);
+        }
+        this.saveFilterState();
+    }
+
+    // checkFilters(file, filterName, filter) {
+    //     if (filter.state == 'neutral')
+    //         return true;
+
+    //     const fileValue = this.getFileValue(filterName, file);
+
+    //     switch (filter.satet)
+    // }
+
+    applyFilters() {
+        const filteredFiles = this.fileManager.originalFiles.filter(file => {
+            return Object.entries(this.filters).every(([filterName, filter]) => {
+                if (filter.state === 'neutral') return true;
+
+                const fileValue = this.getFileValue(filterName, file);
+
+                switch (filter.state) {
+                    case 'forced':
+                        return filter.values.length === 0
+                            ? (fileValue !== undefined && !!fileValue)
+                            : filter.values.includes(fileValue);
+                    case 'discarded':
+                        return filter.values.length === 0
+                            ? (fileValue === undefined || !fileValue)
+                            : !filter.values.includes(fileValue);
+                    default:
+                        return true;
+                }
+            });
+        });
+        console.log(this.filters['indexed'], filteredFiles.length);
+
+        this.fileManager.renderFiles(filteredFiles);
+    }
+
+    getFileValue(filterName, file) {
+        switch (filterName) {
+            case 'class': return file.metadata?.class;
+            case 'rarity': return file.metadata?.rarity?.toString();
+            case 'indexed': return !!file.indexed;
+            default: return file.metadata?.[filterName]?.toString();
+        }
+    }
+
+    setupScrollBehavior() {
+        let ticking = false;
+
+        window.addEventListener('scroll', () => {
+            if (!ticking) {
+                window.requestAnimationFrame(() => {
+                    this.handleScroll();
+                    ticking = false;
+                });
+                ticking = true;
+            }
+        });
+    }
+
+    handleScroll() {
+        const currentScroll = window.pageYOffset;
+        const panel = document.getElementById('filterPanel');
+
+        if (window.innerWidth <= 768) {
+            if (currentScroll > this.lastScrollPos && currentScroll > 100) {
+                panel.classList.add('hidden');
+            } else {
+                panel.classList.remove('hidden');
+            }
+        }
+
+        this.lastScrollPos = currentScroll;
+    }
+
+    setupStatePersistence() {
+        window.addEventListener('beforeunload', () => {
+            localStorage.setItem('adminFilters', JSON.stringify(this.filters));
+        });
+    }
+
+    saveFilterState() {
+        localStorage.setItem('adminFilters', JSON.stringify(this.filters));
+    }
+
+    loadFilterState() {
+        const savedState = localStorage.getItem('adminFilters');
+        if (savedState) {
+            this.filters = JSON.parse(savedState);
+            this.applyFilters();
+            this.renderAllFilterStates();
+        }
+    }
+
+    renderAllFilterStates() {
+        Object.entries(this.filters).forEach(([filterName, filter]) => {
+            const item = document.querySelector(`.filter-item[data-filter="${filterName}"]`);
+            if (item) {
+                this.renderFilterState(item, filter.state);
+            }
+        });
+        this.updateSelectedFiltersDisplay();
+    }
+
+    renderFilterState(item, state) {
+        item.dataset.state = state;
+        item.querySelector('.filter-toggle').textContent =
+            state === 'forced' ? '✓' : state === 'discarded' ? '✕' : '○';
+    }
+
+    setupSearch() {
+        const searchInput = document.querySelector('.filter-search');
+        searchInput.addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            Array.from(document.getElementById('extraFilters').children).forEach(option => {
+                const matches = option.textContent.toLowerCase().includes(searchTerm);
+                option.style.display = matches ? 'block' : 'none';
+            });
+        });
+
+        searchInput.addEventListener('focus', () => {
+            document.getElementById('extraFilters').classList.add('active');
+        });
+    }
+
+    updateSelectedFiltersDisplay() {
+        const container = document.getElementById('selectedFilters');
+        container.innerHTML = Object.entries(this.filters)
+            .filter(([_, filter]) => filter.values.length > 0)
+            .map(([name, filter]) =>
+                filter.values.map(value => `
+            <div class="filter-item" data-filter="${name}" data-value="${value}">
+              ${name}: ${value}
+              <button class="remove-filter">&times;</button>
+            </div>
+          `).join('')
+            ).join('');
+
+        container.querySelectorAll('.remove-filter').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const filterName = btn.parentElement.dataset.filter;
+                const value = btn.parentElement.dataset.value;
+                this.toggleFilterValue(filterName, value);
+                this.applyFilters();
+            });
+        });
+    }
+}
+
 // Initialize admin manager
 new AdminManager();
 
 // Initialize after admin auth
 document.addEventListener('DOMContentLoaded', () => {
     window.charManager = new FileManager();
+
+    // Handle mobile viewport resize
+    window.addEventListener('resize', () => {
+        const panel = document.getElementById('filterPanel');
+        if (window.innerWidth > 768) {
+            panel.classList.remove('hidden');
+        }
+    });
 });

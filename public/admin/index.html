@@ -50,13 +50,39 @@
             <button type="submit">Upload Character</button>
         </form>
     </div>
+
+    <div class="filter-panel" id="filterPanel">
+        <div class="filter-group">
+            <!-- Persistent filters -->
+            <!-- <div class="filter-item" data-filter="class" data-state="neutral">
+                <span class="filter-toggle">C</span>
+                Class
+            </div>
+            <div class="filter-item" data-filter="rarity" data-state="neutral">
+                <span class="filter-toggle">R</span>
+                Rarity
+            </div> -->
+            <div class="filter-item" data-filter="indexed" data-state="neutral">
+                <span class="filter-toggle">I</span>
+                Indexed
+            </div>
+
+            <!-- Dropdown for additional filters -->
+            <div class="filter-dropdown">
+                <input type="text" class="filter-search" placeholder="Search filters...">
+                <div class="filter-options" id="extraFilters"></div>
+            </div>
+        </div>
+        <div class="selected-filters" id="selectedFilters"></div>
+    </div>
+
     <div class="file-manager">
         <h2>Character Files Management</h2>
-        <div class="file-filters">
+        <!-- <div class="file-filters">
             <button class="filter-btn active" data-filter="all">All</button>
             <button class="filter-btn" data-filter="indexed">Indexed</button>
             <button class="filter-btn" data-filter="unindexed">Unindexed</button>
-        </div>
+        </div> -->
         <div class="file-grid" id="fileGrid"></div>
 
         <!-- Edit Modal -->
