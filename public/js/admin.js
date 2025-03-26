@@ -388,12 +388,7 @@ class FileManager {
 class FilterManager {
     constructor(fileManager) {
         this.fileManager = fileManager;
-        this.filters = {
-            class: { state: 'neutral', values: [] },
-            rarity: { state: 'neutral', values: [] },
-            indexed: { state: 'neutral', values: [] },
-            // Will populate extra filters from metadata
-        };
+        this.filters = {};
 
         this.lastScrollPos = 0;
         this.initFilters();
@@ -409,20 +404,22 @@ class FilterManager {
     }
 
     setupCoreFilters() {
-        // Class filter
-        this.createFilterOptions('class', ['Caster', 'Defender', 'Guard', 'Medic', 'Sniper', 'Specialist', 'Supporter', 'Vanguard']);
+        // Indexed filter
+        this.createFilterOptions('indexed');
 
-        // Rarity filter
+        // Add individual rarity filters
         this.createFilterOptions('rarity', ['4', '5', '6']);
 
-        // Indexed filter
-        this.createFilterOptions('indexed', ['indexed', 'unindexed']);
+        // Add class filters
+        this.createFilterOptions('class', ['caster', 'defender', 'guard', 'medic', 'sniper', 'specialist', 'supporter', 'vanguard']);
 
         // Extra filters
         // TODO
     }
 
-    createFilterOptions(filterName, values) {
+    createFilterOptions(filterName, values = []) {
+        this.filters[filterName] = { state: 'neutral', mode: values.length == 0 ? 'tristate' : 'twostate', values: [] };
+
         const container = document.getElementById('extraFilters');
         values.forEach(value => {
             const option = document.createElement('div');
@@ -436,16 +433,36 @@ class FilterManager {
 
     setupFilterEvents() {
         // Toggle filter states
-        document.querySelectorAll('.filter-item').forEach(item => {
+        document.querySelectorAll('.filter-item, .class-filter-item').forEach(item => {
             item.addEventListener('click', (e) => {
                 if (e.target.classList.contains('filter-toggle')) return;
 
                 const filterName = item.dataset.filter;
                 const currentState = item.dataset.state;
-                const newState = this.getNextState(currentState);
+                const filterValue = item.dataset.value;
+                // console.log("clicked on", filterName, currentState, filterValue);
 
-                this.updateFilterState(filterName, newState);
-                this.renderFilterState(item, newState);
+                if (this.filters[filterName].mode == 'tristate') {
+                    const newState = this.getNextState(currentState);
+
+                    this.updateFilterState(filterName, newState);
+                    this.renderFilterState(item, newState);
+                } else { // filter group
+                    const newState = this.getNextState(currentState, 2);
+
+                    if (newState == 'neutral') {
+                        this.filters[filterName].values = this.filters[filterName].values.filter(item => item !== filterValue);
+                    } else {
+                        this.filters[filterName].values = this.filters[filterName].values.filter(item => item !== filterValue);
+                        this.filters[filterName].values.push(filterValue);
+                    }
+                    this.updateFilterState(filterName, this.filters[filterName].values.length == 0 ? 'neutral' : 'forced');
+                    
+                    if (item.matches('.class-filter-item'))
+                        this.renderClassFilterState(item, newState);
+                    else
+                        this.renderFilterState(item, newState);
+                }
             });
         });
 
@@ -468,28 +485,20 @@ class FilterManager {
         });
     }
 
-    getNextState(currentState) {
-        const states = ['neutral', 'forced', 'discarded'];
+    getNextState(currentState, N = 3) {
+        let states = ['neutral', 'forced', 'discarded'];
+        if (N == 2)
+            states = ['neutral', 'forced'];
+
         const currentIndex = states.indexOf(currentState);
         return states[(currentIndex + 1) % states.length];
     }
 
     updateFilterState(filterName, newState) {
-        this.filters[filterName].state = newState;
-        if (newState === 'neutral') {
-            this.filters[filterName].values = [];
-        }
-        this.applyFilters();
-        this.saveFilterState();
-    }
+        // console.log("update filter", filterName, newState);
 
-    toggleFilterValue(filterName, value) {
-        const index = this.filters[filterName].values.indexOf(value);
-        if (index === -1) {
-            this.filters[filterName].values.push(value);
-        } else {
-            this.filters[filterName].values.splice(index, 1);
-        }
+        this.filters[filterName].state = newState;
+        this.applyFilters();
         this.saveFilterState();
     }
 
@@ -505,9 +514,13 @@ class FilterManager {
     applyFilters() {
         const filteredFiles = this.fileManager.originalFiles.filter(file => {
             return Object.entries(this.filters).every(([filterName, filter]) => {
-                if (filter.state === 'neutral') return true;
+                if (filter === 'neutral') return true;
 
                 const fileValue = this.getFileValue(filterName, file);
+
+                // if (filterName == 'class' && this.fileManager.originalFiles.indexOf(file) < 5) {
+                //     console.log(file.filename, filterName, fileValue, filter.values);
+                // }
 
                 switch (filter.state) {
                     case 'forced':
@@ -523,7 +536,7 @@ class FilterManager {
                 }
             });
         });
-        console.log(this.filters['indexed'], filteredFiles.length);
+        // console.log(filteredFiles.length);
 
         this.fileManager.renderFiles(filteredFiles);
     }
@@ -531,7 +544,6 @@ class FilterManager {
     getFileValue(filterName, file) {
         switch (filterName) {
             case 'class': return file.metadata?.class;
-            case 'rarity': return file.metadata?.rarity?.toString();
             case 'indexed': return !!file.indexed;
             default: return file.metadata?.[filterName]?.toString();
         }
@@ -599,6 +611,20 @@ class FilterManager {
         item.dataset.state = state;
         item.querySelector('.filter-toggle').textContent =
             state === 'forced' ? '✓' : state === 'discarded' ? '✕' : '○';
+    }
+
+    renderClassFilterState(item, state) {
+      item.dataset.state = state;
+      
+      // Remove all state classes
+      item.classList.remove(
+        'filter-forced', 
+        'filter-discarded',
+        'filter-neutral'
+      );
+      
+      // Add new state class
+      item.classList.add(`filter-${state}`);
     }
 
     setupSearch() {

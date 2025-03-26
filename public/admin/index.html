@@ -54,23 +54,67 @@
     <div class="filter-panel" id="filterPanel">
         <div class="filter-group">
             <!-- Persistent filters -->
-            <!-- <div class="filter-item" data-filter="class" data-state="neutral">
-                <span class="filter-toggle">C</span>
-                Class
-            </div>
-            <div class="filter-item" data-filter="rarity" data-state="neutral">
-                <span class="filter-toggle">R</span>
-                Rarity
-            </div> -->
             <div class="filter-item" data-filter="indexed" data-state="neutral">
                 <span class="filter-toggle">I</span>
                 Indexed
             </div>
 
+            <div class="filter-subgroup">
+                <div class="filter-label">Rarity:</div>
+                <div class="filter-item" data-filter="rarity" data-value="4" data-state="neutral">
+                    <span class="filter-toggle">○</span>
+                    4★
+                </div>
+                <div class="filter-item" data-filter="rarity" data-value="5" data-state="neutral">
+                    <span class="filter-toggle">○</span>
+                    5★
+                </div>
+                <div class="filter-item" data-filter="rarity" data-value="6" data-state="neutral">
+                    <span class="filter-toggle">○</span>
+                    6★
+                </div>
+            </div>
+
+            <!-- Class Filters -->
+            <div class="filter-subgroup class-filters">
+                <div class="filter-label">Classes:</div>
+                <div class="class-filter-scroll-wrapper">
+                    <div class="class-filter-container">
+                        <div class="class-filter-item" data-filter="class" data-value="Caster" data-state="neutral">
+                            <img src="/images/classes/caster.png" class="class-icon">
+                        </div>
+                        <div class="class-filter-item" data-filter="class" data-value="Defender" data-state="neutral">
+                            <img src="/images/classes/defender.png" class="class-icon">
+                        </div>
+                        <!-- Add similar blocks for other classes -->
+                        <div class="class-filter-item" data-filter="class" data-value="Guard" data-state="neutral">
+                            <img src="/images/classes/guard.png" class="class-icon">
+                        </div>
+                        <div class="class-filter-item" data-filter="class" data-value="Medic" data-state="neutral">
+                            <img src="/images/classes/medic.png" class="class-icon">
+                        </div>
+                        <div class="class-filter-item" data-filter="class" data-value="Sniper" data-state="neutral">
+                            <img src="/images/classes/sniper.png" class="class-icon">
+                        </div>
+                        <div class="class-filter-item" data-filter="class" data-value="Specialist" data-state="neutral">
+                            <img src="/images/classes/specialist.png" class="class-icon">
+                        </div>
+                        <div class="class-filter-item" data-filter="class" data-value="Supporter" data-state="neutral">
+                            <img src="/images/classes/supporter.png" class="class-icon">
+                        </div>
+                        <div class="class-filter-item" data-filter="class" data-value="Vanguard" data-state="neutral">
+                            <img src="/images/classes/vanguard.png" class="class-icon">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Dropdown for additional filters -->
-            <div class="filter-dropdown">
-                <input type="text" class="filter-search" placeholder="Search filters...">
-                <div class="filter-options" id="extraFilters"></div>
+            <div class="filter-search-wrapper">
+                <div class="filter-dropdown">
+                    <input type="text" class="filter-search" placeholder="Search filters...">
+                    <div class="filter-options" id="extraFilters"></div>
+                </div>
             </div>
         </div>
         <div class="selected-filters" id="selectedFilters"></div>
