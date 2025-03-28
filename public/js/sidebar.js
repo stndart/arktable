@@ -33,7 +33,7 @@ class SidebarManager {
 
     displayCharacters(characters) {
         // Create a Set of IDs from the grid layout
-        const layoutIds = new Set(this.gridManager.state.layout);
+        const layoutIds = new Set(this.gridManager.trueState.layout);
 
         // Filter characters that are not in the grid layout
         const missingCharacters = characters.filter(char => !layoutIds.has(char.id));

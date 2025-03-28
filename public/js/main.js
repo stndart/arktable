@@ -29,7 +29,13 @@ class GridManager {
             characters: false,
             profile: false
         };
-        this.cellCache = new Map(); // Add this line
+        this.cellCache = new Map();
+
+        // Original state with all characters
+        this.trueState = {
+            layout: [], // Original order
+            marks: {}
+        };
 
         // Bind share button click
         document.getElementById('share').addEventListener('click', () => {
@@ -44,7 +50,6 @@ class GridManager {
     }
 
     async init_basic() {
-        this.state = { layout: [], marks: {} };
         this.characterMap = new Map();
 
         this.handleDeleteBound = this.handleDelete.bind(this); // Store bound function once
@@ -101,7 +106,7 @@ class GridManager {
 
         try {
             const response = await fetch(endpoint);
-            this.state = await response.json();
+            this.trueState = await response.json();
             await this.loadCharacters();
             this.filterManager.applyFilters();
         } catch (error) {
@@ -288,6 +293,9 @@ class GridManager {
         if (response.ok) {
             await this.loadState();
         }
+        else {
+            this.showError("Import failed: ", response.error);
+        }
     }
 
     showSuccess(message) {
@@ -307,15 +315,12 @@ class GridManager {
     }
 
     handleDragOver(e) {
+        // console.log("handle over");
+
         e.preventDefault();
         if (!this.dragSrcElement) return;
 
         const afterElement = this.getDragAfterElement(e.clientX, e.clientY);
-
-        // this.grid.querySelectorAll('.character-cell:not(.dragging)').forEach(cell => {
-        //     cell.style.opacity = 1;
-        // });
-        // afterElement.style.opacity = 0.1;
 
         if (afterElement) {
             // Get bounding rect of the potential sibling
@@ -334,14 +339,31 @@ class GridManager {
     }
 
     handleDragEnd(e) {
+        // console.log("handle end");
+
         this.dragSrcElement?.classList.remove('dragging');
         this.dragSrcElement = null;
 
-        // this.grid.querySelectorAll('.character-cell:not(.dragging)').forEach(cell => {
-        //     cell.style.opacity = 1;
-        // });
+        // Get new visual order from DOM
+        const newVisualOrder = [...this.grid.children].map(cell => cell.dataset.id);
+        /// ??? curious cell -> item
+
+        // Map visual order changes to true state
+        this.updateTrueStateLayout(newVisualOrder);
+
+        // Update view state to match
+        // this.viewState.layout = newVisualOrder;
 
         this.saveState();
+    }
+
+    updateTrueStateLayout(visualOrder) {
+        const visualSet = new Set(visualOrder);
+        let visualPointer = 0;
+
+        this.trueState.layout = this.trueState.layout.map(id =>
+            visualSet.has(id) ? visualOrder[visualPointer++] : id
+        );
     }
 
     calcOffset(box, x, y) {
@@ -401,7 +423,7 @@ class GridManager {
     }
 
     logState() {
-        console.log('GridManager state:', this.state);
+        console.log('GridManager state:', this.trueState);
     }
 
     async loadCharacters() {
@@ -480,6 +502,13 @@ class GridManager {
         const cell = e.target.closest('.character-cell');
         if (cell) {
             cell.remove();
+
+            const index = this.trueState.layout.indexOf(cell.dataset.id);
+            if (index !== -1) {
+              this.trueState.layout.splice(index, 1);
+              this.trueState.marks.splice(index, 1);
+            }
+
             this.saveState();
         }
     }
@@ -491,10 +520,11 @@ class GridManager {
 
     addCharacterById(charId) {
         const character = this.characters.find(c => c.id === charId);
-        if (character && !this.state.layout.some(l => l === character.id)) {
+        if (character && !this.trueState.layout.some(l => l === character.id)) {
             const cell = this.createCharacterCell(character);
             this.grid.appendChild(cell);
-            this.state.layout.push(character.id);
+            this.trueState.layout.push(character.id);
+            this.trueState.marks.push({ checks: false, marks: 0 });
             this.saveState();
         }
     }
@@ -502,6 +532,7 @@ class GridManager {
     toggleCheckMark(cell) {
         const checkMark = cell.querySelector('.check-mark');
         checkMark.style.display = checkMark.style.display === 'none' ? 'block' : 'none';
+        this.trueState.marks[cell.dataset.id].checks = !(checkMark.style.display === 'none');
         this.saveState();
     }
 
@@ -529,13 +560,14 @@ class GridManager {
 
     // Add a circle (increase the count)
     addCircle(charId) {
-        const circles = this.grid.querySelector(`[data-id="${charId}"] .circles`).children;
+        const circles = Array.from(this.grid.querySelector(`[data-id="${charId}"] .circles`).children);
         for (let circle of circles) {
             if (!circle.classList.contains('show')) {
                 circle.classList.add('show');
                 break;
             }
         }
+        this.trueState.marks[charId].circles = circles.filter(circle => circle.classList.contains('show')).length;
         this.saveState();
     }
 
@@ -548,6 +580,8 @@ class GridManager {
                 break;
             }
         }
+
+        this.trueState.marks[charId].circles = circles.filter(circle => circle.classList.contains('show')).length;
         this.saveState();
     }
 
@@ -561,7 +595,7 @@ class GridManager {
             const response = await fetch('/api/profile', {
                 headers: { 'Authorization': `Bearer ${this.token}` }
             });
-            this.state = await response.json();
+            this.trueState = await response.json();
             this.filterManager.applyFilters();
         } finally {
             this.loadingState.profile = false;
@@ -585,7 +619,7 @@ class GridManager {
         }
 
         if (state) {
-            this.state = state;
+            this.trueState = state;
             this.filterManager.applyFilters();
 
             // console.log("state applied");
@@ -607,12 +641,12 @@ class GridManager {
     applyLayout() {
         // Filter layout based on current filteredFiles
         const filteredIds = new Set(this.filteredFiles.map(f => f.metadata.id));
-        const filteredLayout = this.state.layout.filter(id => filteredIds.has(id));
+        const filteredLayout = this.trueState.layout.filter(id => filteredIds.has(id));
 
-        // console.log('layout', this.state.layout);
+        // console.log('layout', this.trueState.layout);
         // console.log('filtered files', this.filteredFiles);
         // console.log('filtered layout', filteredLayout);
-        
+
         // Add visual placeholders first
         this.grid.innerHTML = filteredLayout
             .map(() => `<div class="cell-placeholder"></div>`)
@@ -636,7 +670,7 @@ class GridManager {
     }
 
     applyState() {
-        Object.entries(this.state.marks).forEach(([id, marks]) => {
+        Object.entries(this.trueState.marks).forEach(([id, marks]) => {
             const cell = this.cellCache.get(id); // Use cached cells
 
             if (cell) {
@@ -659,28 +693,15 @@ class GridManager {
     }
 
     getCurrentState() {
-        // Collect current state
-        const state = {
-            layout: [...this.grid.children].map(cell => cell.dataset.id),
-            marks: {}
+        return {
+            layout: this.trueState.layout,
+            marks: this.trueState.marks
         };
-
-        this.grid.querySelectorAll('.character-cell').forEach(cell => {
-            const id = cell.dataset.id;
-            state.marks[id] = {
-                checks: cell.querySelector('.check-mark').style.display === 'block',
-
-                // Count how many circles have the 'show' class (i.e., are visible)
-                circles: [...cell.querySelectorAll('.circle')].filter(c => c.classList.contains('show')).length
-            };
-        });
-
-        return state;
     }
 
     async saveState() {
         const state = this.getCurrentState();
-        console.log("save state, shared?", this.isSharedPage, "logged in?", this.isLoggedIn);
+        // console.log("save state, shared?", this.isSharedPage, "logged in?", this.isLoggedIn);
 
         // For shared pages in edit mode
         if (this.isSharedPage && this.isEditable) {
@@ -698,7 +719,7 @@ class GridManager {
     }
 
     async saveToServer(state) {
-        console.log('save to server')
+        // console.log('save to server')
 
         if (this.isSharedPage && !this.isPersistentShare) {
             await this.saveSnapshotToServer(state);
@@ -785,7 +806,7 @@ class GridManager {
 
     async shareGrid() {
         console.log("share button pressed");
-        const state = this.state;
+        const state = this.getCurrentState();
 
         try {
             let baseUrl;
@@ -834,7 +855,7 @@ class GridManager {
     }
 
     exportToFile() {
-        const state = this.state;
+        const state = this.getCurrentState();
         const blob = new Blob([JSON.stringify(state)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -868,12 +889,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.gridManager = new GridManager();
 
     try {
-        await gridManager.initializeAuth(); // Critical auth check
-        await gridManager.initialize();
+        await window.gridManager.initializeAuth(); // Critical auth check
+        await window.gridManager.initialize();
 
     } catch (error) {
         console.error('Initialization error:', error);
-        gridManager.showError('Failed to load data');
+        window.gridManager.showError('Failed to load data');
     }
     sidebarManager = new SidebarManager(window.gridManager);
 });
