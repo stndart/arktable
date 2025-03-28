@@ -56,9 +56,17 @@ class FileManager {
         // Get token from URL
         const urlParams = new URLSearchParams(window.location.search);
         this.adminToken = urlParams.get('token');
-        
+
         this.subclasses = {};
         this.loadSubclasses();
+
+        // Add original files reference
+        this.originalFiles = [];
+
+        // Initialize filter manager after loading files
+        this.loadFiles().then(() => {
+            this.filterManager = new FilterManager(this);
+        });
 
         this.fileGrid = document.getElementById('fileGrid');
         this.editModal = document.getElementById('editModal');
@@ -142,21 +150,17 @@ class FileManager {
             url.searchParams.set('token', new URLSearchParams(window.location.search).get('token'));
 
             const response = await fetch(url);
-            let files = await response.json();
-
-            if (filter !== 'all') {
-                files = files.filter(f =>
-                    filter === 'indexed' ? f.indexed : !f.indexed
-                );
-            }
-
-            this.renderFiles(files);
+            // let files = await response.json();
+            this.originalFiles = await response.json();
+            this.filterManager?.applyFilters();
         } catch (error) {
             console.error('Failed to load files:', error);
         }
     }
 
     renderFiles(files) {
+        console.log("render", files[0]);
+
         this.fileGrid.innerHTML = files.map(file => `
             <div class="file-card ${file.indexed ? '' : 'unindexed'}">
                 <button class="delete-btn" data-file="${file.filename}">&times;</button>
@@ -203,7 +207,7 @@ class FileManager {
         document.getElementById('charName').value = file?.metadata?.name || '';
         document.getElementById('charClass').value = file?.metadata?.class || '';
         document.getElementById('charRarity').value = file?.metadata?.rarity?.toString() || '4';
-        
+
         this.setupClassSubclassBinding();
         this.updateSubclassOptions(file?.metadata?.class);
         document.getElementById('charSubclass').value = file?.metadata?.subclass || '';
@@ -221,7 +225,7 @@ class FileManager {
     updateSubclassOptions(className) {
         const subclassSelect = document.getElementById('charSubclass');
         subclassSelect.innerHTML = '';
-        
+
         if (this.subclasses[className]) {
             this.subclasses[className].forEach(subclass => {
                 const option = document.createElement('option');
@@ -389,4 +393,12 @@ new AdminManager();
 // Initialize after admin auth
 document.addEventListener('DOMContentLoaded', () => {
     window.charManager = new FileManager();
+
+    // Handle mobile viewport resize
+    window.addEventListener('resize', () => {
+        const panel = document.getElementById('filterPanel');
+        if (window.innerWidth > 768) {
+            panel.classList.remove('hidden');
+        }
+    });
 });

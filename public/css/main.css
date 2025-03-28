@@ -32,9 +32,10 @@ body {
         margin: 0 auto;
     }
 }
+
 @media (max-width: 480px) {
     .grid {
-		grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
     }
 }
 
@@ -75,7 +76,8 @@ body {
     width: 100%;
     height: 100%;
     object-fit: contain;
-    pointer-events: none; /* Prevent images from blocking drag events */
+    pointer-events: none;
+    /* Prevent images from blocking drag events */
 }
 
 /* Overlay Elements */
@@ -133,7 +135,7 @@ body {
 
 /* Controls */
 .controls {
-    margin: 20px 0;
+    margin: 1rem;
     display: flex;
     gap: 10px;
     flex-wrap: wrap;
@@ -565,5 +567,23 @@ button:hover,
 
     .sidebar-character img {
         height: 80px;
+    }
+}
+
+/* Reuse admin filter styles with minor adjustments */
+.filter-panel {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(5px);
+}
+
+.class-filter-item {
+    background: rgba(0, 0, 0, 0.1);
+}
+
+/* Mobile adjustments */
+@media (max-width: 768px) {
+    .filter-panel {
+        top: 56px;
+        /* Below header */
     }
 }

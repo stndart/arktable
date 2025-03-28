@@ -34,7 +34,7 @@
     background: white;
     padding: 1rem;
     border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     transition: transform 0.2s;
     z-index: 2;
 }
@@ -87,7 +87,7 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0,0,0,0.5);
+    background: rgba(0, 0, 0, 0.5);
     z-index: 5;
 }
 
@@ -157,7 +157,8 @@
     margin-top: 0.25rem;
 }
 
-input:invalid, select:invalid {
+input:invalid,
+select:invalid {
     border-color: #ff4444 !important;
 }
 
@@ -183,6 +184,7 @@ input:invalid, select:invalid {
 .select-loading {
     position: relative;
 }
+
 .select-loading::after {
     content: "Loading...";
     position: absolute;
