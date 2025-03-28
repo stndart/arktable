@@ -52,11 +52,12 @@
 }
 
 .auth-controls {
-    position: fixed;
+    /* position: fixed; */
     top: 20px;
     right: 20px;
     display: flex;
     gap: 10px;
+    margin-left: auto;
 }
 
 #userInfo {

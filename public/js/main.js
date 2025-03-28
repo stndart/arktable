@@ -22,13 +22,14 @@ class GridManager {
 
         this.grid = document.getElementById('characterGrid');
 
+        this.originalFiles = []; // Will store all characters
+        this.filteredFiles = []; // Current filtered characters
+
         this.loadingState = {
             characters: false,
             profile: false
         };
         this.cellCache = new Map(); // Add this line
-
-        this.shareManager = new ShareManager(this);
 
         // Bind share button click
         document.getElementById('share').addEventListener('click', () => {
@@ -37,6 +38,9 @@ class GridManager {
 
         this.init_basic();
         this.setupImport();
+
+        this.shareManager = new ShareManager(this);
+        this.filterManager = new FilterManager(this);
     }
 
     async init_basic() {
@@ -56,6 +60,10 @@ class GridManager {
 
     async initialize() {
         console.log('initialize with shared?', this.isSharedPage);
+
+        await this.loadCharacters();
+        this.filterManager.initFilters();
+
         if (this.isSharedPage) {
             await this.loadSharedData();
         } else {
@@ -95,7 +103,7 @@ class GridManager {
             const response = await fetch(endpoint);
             this.state = await response.json();
             await this.loadCharacters();
-            this.applyLayout();
+            this.filterManager.applyFilters();
         } catch (error) {
             console.error('Failed to load shared data:', error);
             this.showError(
@@ -359,7 +367,7 @@ class GridManager {
         const closest_row = sortedElements.reduce((closest, child) => {
             const { offsetX, offsetY } = this.calcOffset(child.getBoundingClientRect(), x, y);
             const distance = Math.sqrt(offsetX ** 2 + offsetY ** 2);
-            
+
             const better_Y = (Math.abs(offsetY) == Math.abs(closest.offsetY)) ? (offsetY <= closest.offsetY) : (Math.abs(offsetY) <= Math.abs(closest.offsetY));
             if (better_Y) {
                 return {
@@ -397,15 +405,20 @@ class GridManager {
     }
 
     async loadCharacters() {
-        // console.log("loadCharacters");
         this.loadingState.characters = true;
-
         try {
             const response = await fetch('/api/characters');
             const { characters } = await response.json();
             this.characters = characters;
-            // Create ID map for quick lookup
             this.characterMap = new Map(this.characters.map(c => [c.id, c]));
+            this.originalFiles = this.characters.map(c => ({
+                metadata: { // Match admin page structure
+                    id: c.id,
+                    class: c.class,
+                    rarity: c.rarity,
+                    name: c.name
+                }
+            }));
         } catch (error) {
             console.error('Error loading characters:', error);
         } finally {
@@ -549,7 +562,7 @@ class GridManager {
                 headers: { 'Authorization': `Bearer ${this.token}` }
             });
             this.state = await response.json();
-            this.applyLayout();
+            this.filterManager.applyFilters();
         } finally {
             this.loadingState.profile = false;
         }
@@ -573,7 +586,7 @@ class GridManager {
 
         if (state) {
             this.state = state;
-            this.applyLayout();
+            this.filterManager.applyFilters();
 
             // console.log("state applied");
             // this.logState();
@@ -584,20 +597,32 @@ class GridManager {
 
     }
 
+    // Add this method to satisfy FilterManager requirements
+    renderFiles(files) {
+        // console.log("render files", files)
+        this.filteredFiles = files;
+        this.applyLayout();
+    }
+
     applyLayout() {
+        // Filter layout based on current filteredFiles
+        const filteredIds = new Set(this.filteredFiles.map(f => f.metadata.id));
+        const filteredLayout = this.state.layout.filter(id => filteredIds.has(id));
+
+        // console.log('layout', this.state.layout);
+        // console.log('filtered files', this.filteredFiles);
+        // console.log('filtered layout', filteredLayout);
+        
         // Add visual placeholders first
-        this.grid.innerHTML = this.state.layout
+        this.grid.innerHTML = filteredLayout
             .map(() => `<div class="cell-placeholder"></div>`)
             .join('');
 
         // Then populate with actual data
         requestAnimationFrame(() => {
             this.grid.innerHTML = '';
-
-            const uniqueIDs = [...new Set(this.state.layout)];
             this.cellCache = new Map(); // Track created cells
-
-            uniqueIDs.forEach(charId => {
+            filteredLayout.forEach(charId => {
                 if (this.characterMap.has(charId)) {
                     const character = this.characterMap.get(charId);
                     const cell = this.createCharacterCell(character);

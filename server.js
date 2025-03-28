@@ -360,8 +360,9 @@ app.post('/api/save-shared', async (req, res) => {
 app.post('/api/share', async (req, res) => {
     const shareId = uuidv4();
     const filePath = path.join(SHARED_DIR, `${shareId}.json`);
-
-    await fs.truncate(filePath, 0);
+    try {
+        await fs.truncate(filePath, 0);
+    } catch {}
     await fs.writeFile(filePath, JSON.stringify({
         ...req.body,
         meta: {
@@ -555,7 +556,7 @@ app.post('/admin/update-file', adminAuth, async (req, res) => {
         } else {
             data.characters.push(newCharacter);
         }
-        
+
         await fs.truncate(CHAR_DATA_FILE, 0);
         await fs.writeFile(CHAR_DATA_FILE, JSON.stringify(data, null, 2));
         reload_chars();
