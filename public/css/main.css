@@ -587,3 +587,39 @@ button:hover,
         /* Below header */
     }
 }
+
+/* Skin Popup */
+.skin-popup {
+    position: fixed;
+    background: rgba(0, 0, 0, 0.5);
+    border-radius: 8px;
+    padding: 1rem;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.skin-options {
+    display: grid;
+    grid-template-columns: repeat(3, 80px);
+    gap: 0.5rem;
+}
+
+.skin-option {
+    width: 80px;
+    height: 80px;
+    object-fit: contain;
+    cursor: pointer;
+    border: 2px solid transparent;
+    border-radius: 4px;
+    transition: transform 0.2s;
+}
+
+.skin-option:hover {
+    transform: scale(1.1);
+    z-index: 2;
+}
+
+.skin-option.selected {
+    border-color: #4CAF50;
+    box-shadow: 0 0 8px rgba(76, 175, 80, 0.5);
+}

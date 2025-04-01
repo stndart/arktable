@@ -144,7 +144,8 @@ async function init() {
             marks: {
                 "wisadel": { checks: true, circles: 2 },
                 "schwarz": { checks: false, circles: 0 }
-            }
+            },
+            skins: {}
         }));
     }
 }
@@ -160,20 +161,34 @@ app.get('/api/subclasses', async (req, res) => {
     }
 });
 
+app.get("/characters/undefined", async (req, res) => {
+    res.status(400).send("Ty durak?");
+    // res.json({'abacaba': 'ty durak?'});
+});
+
 // Get all characters
 app.get('/api/characters', async (req, res) => {
     try {
-        const data = await fs.readFile(CHAR_DATA_FILE);
-        res.json(JSON.parse(data));
+        res.json(charData);
     } catch (error) {
         res.status(500).send('Error loading characters');
-        Console.log(error);
+        console.log(error);
     }
+});
+
+// Get available skins
+app.get('/api/character/:id/skins', async (req, res) => {
+    const character = charData.characters.find(c => c.id === req.params.id);
+
+    res.json({
+        default: character?.skins.default,
+        alternates: character?.skins.alternates || []
+    });
 });
 
 app.post('/api/import', async (req, res) => {
     try {
-        const { layout, marks } = req.body;
+        const { layout, marks, skins } = req.body;
 
         // Validate layout structure
         if (!Array.isArray(layout)) {
@@ -199,6 +214,12 @@ app.post('/api/import', async (req, res) => {
         // Validate marks structure
         if (!marks || typeof marks !== 'object' || Array.isArray(marks)) {
             return res.status(400).json({ error: 'Invalid marks format' });
+        }
+
+        // Validate skins structure
+        const allSkinIdsValid = skins.every(id => validCharIds.has(id));
+        if (!allSkinIdsValid) {
+            return res.status(400).json({ error: 'Some skins character IDs do not exist' });
         }
 
         // Validate each mark entry:
@@ -495,7 +516,9 @@ app.get('/admin/files', adminAuth, async (req, res) => {
             if (!file.endsWith('.png')) return null;
 
             const stats = await fs.stat(path.join(CHARACTERS_DIR, file));
-            const existing = charData.characters.find(c => c.skins?.default === file);
+            let existing = charData.characters.find(c => c.skins?.default === file);
+            if (!existing)
+                existing = charData.characters.find(c => c.skins?.alternates?.includes(file));
 
             return {
                 filename: file,
@@ -574,15 +597,16 @@ async function addChar(characters, originalFile, id, name, charClass, charSubcla
 
 async function addSkin(characters, idExists, originalFile, id, name, charClass, charSubclass, rarity) {
     // Validate fields match
-    if (
-        // idExists.id !== id || // is always false
-        idExists.name !== name ||
-        idExists.class !== charClass ||
-        idExists.subclass !== charSubclass ||
-        idExists.rarity !== rarity
-    ) {
-        return { error: "Field mismatch for skin addition" };
-    }
+    // disabled since fields can be empty
+    // if (
+    //     // idExists.id !== id || // is always false
+    //     idExists.name !== name ||
+    //     idExists.class !== charClass ||
+    //     idExists.subclass !== charSubclass ||
+    //     idExists.rarity !== rarity
+    // ) {
+    //     return { error: "Field mismatch for skin addition" };
+    // }
 
     idExists.skins.alternates.push(originalFile);
     idExists.meta.modified = new Date().toISOString();
@@ -662,6 +686,7 @@ app.post('/admin/update-file', adminAuth, async (req, res) => {
         }
 
         if ('error' in status) {
+            console.log("update file failed:", status);
             res.status(400).json(status);
         }
         else {

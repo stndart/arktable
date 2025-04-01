@@ -160,7 +160,6 @@ class FileManager {
 
     renderFiles(files) {
         console.log(`rendering ${files.length} files`);
-        this.kek = files[0];
 
         this.fileGrid.innerHTML = files.map(file => `
             <div class="file-card ${file.indexed ? '' : 'unindexed'}">

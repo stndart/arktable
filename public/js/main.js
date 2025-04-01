@@ -34,7 +34,8 @@ class GridManager {
         // Original state with all characters
         this.trueState = {
             layout: [], // Original order
-            marks: {}
+            marks: {},
+            skins: {} // Stores { [characterId]: skinFileName }
         };
 
         // Bind share button click
@@ -470,13 +471,14 @@ class GridManager {
         cell.dataset.id = character.id;
         cell.draggable = true;
 
+        // Get current skin or default
+        const currentSkin = this.trueState.skins[character.id] || character.skins.default;
+
         cell.innerHTML = `
+            <img src="/characters/${currentSkin}" class="character-image">
             <div class="check-mark" style="display: none;"></div>
-            <img src="/characters/${character.image}" class="character-image">
             <div class="circles">
-                <div class="circle"></div>
-                <div class="circle"></div>
-                <div class="circle"></div>
+                ${[0, 0, 0].map(() => `<div class="circle"></div>`).join('')}
             </div>
         `;
 
@@ -505,8 +507,8 @@ class GridManager {
 
             const index = this.trueState.layout.indexOf(cell.dataset.id);
             if (index !== -1) {
-              this.trueState.layout.splice(index, 1);
-              this.trueState.marks.splice(index, 1);
+                this.trueState.layout.splice(index, 1);
+                this.trueState.marks.splice(index, 1);
             }
 
             this.saveState();
@@ -550,12 +552,68 @@ class GridManager {
             <div class="context-item" onclick="gridManager.removeCircle('${cell.dataset.id}')">Remove Circle</div>
         `;
 
+        // Add skin selector if available
+        const character = this.characterMap.get(cell.dataset.id);
+        // if (character.skins.alternates.length > 0) {
+        if (true) {
+            menu.innerHTML += `
+                <div class="context-item" onclick="gridManager.showSkinPopup('${cell.dataset.id}', ${x}, ${y})">
+                    Change Skin
+                </div>
+            `;
+        }
+
         document.body.appendChild(menu);
 
         // Close menu on click outside
         setTimeout(() => {
             document.addEventListener('click', () => menu.remove(), { once: true });
         });
+    }
+
+    // New method for skin popup
+    async showSkinPopup(charId, x, y) {
+        const character = this.characterMap.get(charId);
+        const popup = document.createElement('div');
+        popup.className = 'skin-popup';
+        popup.style.left = `${x}px`;
+        popup.style.top = `${y}px`;
+
+        const skins = [character.skins.default, ...character.skins.alternates];
+
+        popup.innerHTML = `
+            <div class="skin-options">
+            ${skins.map(skin => `
+                <img src="/characters/${skin}" 
+                    class="skin-option ${this.trueState.skins[charId] === skin ? 'selected' : ''}"
+                    onclick="gridManager.selectSkin('${charId}', '${skin}')">
+            `).join('')}
+            </div>
+        `;
+
+        document.body.appendChild(popup);
+
+        // Close on outside click
+        setTimeout(() => {
+            document.addEventListener('click', () => popup.remove(), { once: true });
+        });
+    }
+
+    selectSkin(charId, skin) {
+        const character = this.characterMap.get(charId);
+
+        // Only store non-default skins
+        if (skin === character.skins.default) {
+            delete this.trueState.skins[charId];
+        } else {
+            this.trueState.skins[charId] = skin;
+        }
+
+        // Update visible image
+        const img = this.grid.querySelector(`[data-id="${charId}"] .character-image`);
+        if (img) img.src = `/characters/${skin}`;
+
+        this.saveState();
     }
 
     // Add a circle (increase the count)
@@ -619,7 +677,11 @@ class GridManager {
         }
 
         if (state) {
-            this.trueState = state;
+            this.trueState = {
+                layout: state.layout || [],
+                marks: state.marks || {},
+                skins: state.skins || {}
+            };
             this.filterManager.applyFilters();
 
             // console.log("state applied");
@@ -690,12 +752,19 @@ class GridManager {
                 });
             }
         });
+
+        // Apply skins
+        Object.entries(this.trueState.skins).forEach(([id, skin]) => {
+            const img = this.grid.querySelector(`[data-id="${id}"] .character-image`);
+            if (img) img.src = `/characters/${skin}`;
+        });
     }
 
     getCurrentState() {
         return {
             layout: this.trueState.layout,
-            marks: this.trueState.marks
+            marks: this.trueState.marks,
+            skins: this.trueState.skins
         };
     }
 

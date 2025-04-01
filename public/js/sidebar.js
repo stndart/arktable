@@ -41,7 +41,7 @@ class SidebarManager {
         const container = document.getElementById('sidebarGrid');
         container.innerHTML = missingCharacters.map(char => `
             <div class="sidebar-character" data-id="${char.id}">
-                <img src="/characters/${char.image}" alt="${char.name}" title="${char.name}">
+                <img src="/characters/${char.skins.default}" alt="${char.name}" title="${char.name}">
             </div>
         `).join('');
 
