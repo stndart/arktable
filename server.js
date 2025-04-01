@@ -20,12 +20,12 @@ const DATA_PATH = path.join(__dirname, '/data');
 const SHARED_DIR = path.join(DATA_PATH, 'shared');
 const PROFILE_DIR = path.join(DATA_PATH, 'profiles');
 
-const PUBLIC_DATA_PATH = path.join(__dirname, 'public/data')
+const PUBLIC_DATA_PATH = path.join(__dirname, 'data/common')
 const CHARACTERS_DIR = path.join(__dirname, 'data/characters');
 const SUBCLASSES_FILE = path.join(PUBLIC_DATA_PATH, 'classes.json');
 const CHAR_DATA_FILE = path.join(PUBLIC_DATA_PATH, 'characters.json');
 let charData = require(CHAR_DATA_FILE);
-let validCharIds = new Set(charData.characters.map(char => char.id));
+let validCharIds = new Set(charData.characters?.map(char => char.id));
 
 const upload = multer({
     dest: path.join(CHARACTERS_DIR, 'temp/'),
@@ -37,16 +37,20 @@ const watcher = chokidar.watch(CHAR_DATA_FILE, {
     ignoreInitial: true
 });
 
+let timeout;
 watcher.on('change', () => {
-    console.log("Detected char data file change");
-    reload_chars();
+    clearTimeout(timeout);
+    timeout = setTimeout(() => {
+        console.log("Detected char data file change");
+        reload_chars();
+    }, 500); // Adjust delay if needed
 });
 
 function reload_chars() {
     // console.log("Reloaded chars");
     delete require.cache[require.resolve(CHAR_DATA_FILE)];
     charData = require(CHAR_DATA_FILE);
-    validCharIds = new Set(charData.characters.map(char => char.id));
+    validCharIds = new Set(charData.characters?.map(char => char.id));
 }
 
 
@@ -362,7 +366,7 @@ app.post('/api/share', async (req, res) => {
     const filePath = path.join(SHARED_DIR, `${shareId}.json`);
     try {
         await fs.truncate(filePath, 0);
-    } catch {}
+    } catch { }
     await fs.writeFile(filePath, JSON.stringify({
         ...req.body,
         meta: {
@@ -418,7 +422,7 @@ app.post('/admin/add', upload.single('image'), async (req, res) => {
     const filename = `${id}.png`;
 
     // Read existing data
-    const data = JSON.parse(await fs.readFile(CHAR_DATA_FILE));
+    const data = await loadCharacters();
     // Check for duplicate id
     if (data.characters.some(c => c.id === id)) {
         return res.status(400).json({ error: 'Character with this name already exists' });
@@ -456,8 +460,7 @@ app.post('/admin/remove-index', adminAuth, async (req, res) => {
     const { filename } = req.body;
 
     try {
-        const metaPath = path.join(__dirname, 'public/data/characters.json');
-        const data = require(metaPath);
+        const data = require(CHAR_DATA_FILE);
 
         // Toggle existence in metadata
         const index = data.characters.findIndex(c => c.image === filename);
@@ -487,7 +490,6 @@ app.post('/admin/remove-index', adminAuth, async (req, res) => {
 app.get('/admin/files', adminAuth, async (req, res) => {
     try {
         const files = await fs.readdir(CHARACTERS_DIR);
-        const metadata = require(CHAR_DATA_FILE).characters;
 
         const fileData = await Promise.all(files.map(async (file) => {
             if (!file.endsWith('.png')) return null;
@@ -514,6 +516,98 @@ app.get('/admin/files', adminAuth, async (req, res) => {
     }
 });
 
+async function loadCharacters() {
+    return JSON.parse(await fs.readFile(CHAR_DATA_FILE)).characters;
+}
+
+async function changeID(characters, originalFile, id) {
+    const oldChar = characters.find(c =>
+        c.skins.default === originalFile ||
+        c.skins.alternates.includes(originalFile)
+    );
+
+    if (!oldChar) {
+        return { error: "Original file not found" };
+    }
+
+    // Move all skins to new ID
+    const newChar = {
+        ...oldChar,
+        id,
+        skins: oldChar.skins,
+        meta: {
+            ...oldChar.meta,
+            modified: new Date().toISOString()
+        }
+    };
+
+    // Remove old character
+    characters = characters.filter(c => c.id !== oldChar.id);
+    characters.push(newChar);
+
+    // Rename files
+    await renameFile(oldChar.skins.default, `${id}.png`);
+    await Promise.all(oldChar.skins.alternates.map(async (skin, index) => {
+        await renameFile(skin, `${id}_skin${index + 1}.png`);
+    }));
+
+    return { success: true };
+}
+
+async function addChar(characters, originalFile, id, name, charClass, charSubclass, rarity) {
+    const newChar = {
+        id,
+        name,
+        class: charClass,
+        subclass: charSubclass,
+        rarity,
+        skins: {
+            default: `${id}.png`,
+            alternates: []
+        },
+        meta: {
+            created: new Date().toISOString(),
+            modified: new Date().toISOString()
+        }
+    };
+    await renameFile(originalFile, `${id}.png`);
+    characters.push(newChar);
+    return { success: true };
+}
+
+async function addSkin(characters, idExists, originalFile, id, name, charClass, charSubclass, rarity) {
+    // Validate fields match
+    if (
+        // idExists.id !== id || // is always false
+        idExists.name !== name ||
+        idExists.class !== charClass ||
+        idExists.subclass !== charSubclass ||
+        idExists.rarity !== rarity
+    ) {
+        return { error: "Field mismatch for skin addition" };
+    }
+
+    idExists.skins.alternates.push(originalFile);
+    idExists.meta.modified = new Date().toISOString();
+    return { success: true };
+}
+
+async function updateChar(characters, id, name, charClass, charSubclass, rarity) {
+    const charIndex = characters.findIndex(c => c.id === id);
+    characters[charIndex] = {
+        ...characters[charIndex],
+        name: name || characters[charIndex].name,
+        class: charClass || characters[charIndex].class,
+        subclass: charSubclass || characters[charIndex].subclass,
+        rarity: rarity || characters[charIndex].rarity,
+        meta: {
+            ...characters[charIndex].meta,
+            modified: new Date().toISOString()
+        }
+    };
+    return { success: true };
+}
+
 // Update metadata and rename file
 app.post('/admin/update-file', adminAuth, async (req, res) => {
     const { originalFile, id, name, class: charClass, subclass: charSubclass, rarity } = req.body;
@@ -526,41 +620,52 @@ app.post('/admin/update-file', adminAuth, async (req, res) => {
         }
 
         // Read existing data
-        const data = JSON.parse(await fs.readFile(CHAR_DATA_FILE));
-        // Check for duplicate id
-        // if (data.characters.some(c => c.id === id)) {
-        //     return res.status(400).json({ error: 'Character with this id already exists' });
-        // }
-
-        const newFilename = `${id}.png`;
-
-        // Rename file
-        await fs.rename(
-            path.join(CHARACTERS_DIR, originalFile),
-            path.join(CHARACTERS_DIR, newFilename)
+        const characters = await loadCharacters();
+        const fileExists = characters.some(c =>
+            c.skins.default === originalFile ||
+            c.skins.alternates.includes(originalFile)
         );
+        const idExists = characters.find(c => c.id === id);
 
-        // Update metadata
-        const existingIndex = data.characters.findIndex(c => c.image === originalFile);
-        const newCharacter = {
-            id,
-            name,
-            class: charClass,
-            subclass: charSubclass,
-            rarity,
-            image: newFilename
-        };
-
-        if (existingIndex > -1) {
-            data.characters[existingIndex] = newCharacter;
-        } else {
-            data.characters.push(newCharacter);
+        let status = { success: false };
+        let newFilename;
+        // Case d: Change ID
+        if (fileExists && !idExists) {
+            // if (originalFile && idExists && idExists.id !== originalFile.replace('.png', '')) { /// TODO: bugged?
+            status = await changeID(characters, originalFile, id);
+            console.log("Changing id of {} to {}", originalFile, id)
+        }
+        // Case a: Add new entry
+        if (!fileExists && !idExists) {
+            status = await addChar(characters, originalFile, id, name, charClass, charSubclass, rarity);
+            newFilename = `${id}.png`;
+            console.log("Added new char {} with id {}", originalFile, id);
+        }
+        // Case c: Add skin
+        if (!fileExists && idExists) {
+            status = await addSkin(characters, idExists, originalFile, id, name, charClass, charSubclass, rarity);
+            newFilename = originalFile;
+            console.log("Added new skin {} for char id {}", originalFile, id);
+        }
+        // Case b: Update record
+        if (fileExists && idExists) {
+            if (fileExists.id !== idExists.id) {
+                console.log("New id already exists");
+                status = { error: "New id already exists" };
+            }
+            status = await updateChar(characters, id, name, charClass, charSubclass, rarity);
+            console.log("Updated char entry for char id {}", id);
         }
 
-        await fs.truncate(CHAR_DATA_FILE, 0);
-        await fs.writeFile(CHAR_DATA_FILE, JSON.stringify(data, null, 2));
-        reload_chars();
-        res.json({ success: true, newFilename });
+        if ('error' in status) {
+            res.status(400).json(status);
+        }
+        else {
+            await fs.truncate(CHAR_DATA_FILE, 0);
+            await fs.writeFile(CHAR_DATA_FILE, JSON.stringify({ characters: characters }, null, 2));
+            reload_chars();
+            res.json({ success: true, newFilename });
+        }
     } catch (error) {
         console.log("Error updating file", error);
         res.status(500).json({ error: 'File update failed' });

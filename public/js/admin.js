@@ -191,12 +191,10 @@ class FileManager {
     }
 
     async showEditModal(filename) {
-        const url = new URL('/admin/files', window.location.href);
-        url.searchParams.set('token', new URLSearchParams(window.location.search).get('token'));
-
-        const response = await fetch(url);
-        let files = await response.json();
-        const file = files.find(f => f.filename === filename);
+        const file = this.originalFiles.find(f => f.filename === filename);
+        // const isSkin = !!this.originalFiles.find(f => 
+        //   f.metadata?.skins?.alternates.includes(filename)
+        // );
 
         const form = document.getElementById('metadataForm');
         form.reset();
@@ -287,10 +285,16 @@ class FileManager {
         let isValid = true;
 
         // Required fields
-        const requiredFields = ['charName', 'charClass', 'charSubclass', 'charRarity'];
+        const idField = document.getElementById('charId');
+        let requiredFields;
+        if (this.originalFiles.some(file => file.metadata?.id === idField.value)) // adding skin
+            requiredFields = [];
+        else
+            requiredFields = ['charName', 'charClass', 'charSubclass', 'charRarity'];
+
         requiredFields.forEach(id => {
             const field = document.getElementById(id);
-            if (!field.value.trim()) {
+            if (!field?.value.trim()) {
                 this.showFieldError(field, 'This field is required');
                 isValid = false;
             } else {
@@ -299,7 +303,6 @@ class FileManager {
         });
 
         // ID format validation
-        const idField = document.getElementById('charId');
         if (!/^[_a-z0-9\-]+$/.test(idField.value)) {
             this.showFieldError(idField, 'Only lowercase letters allowed');
             isValid = false;
