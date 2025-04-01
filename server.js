@@ -28,7 +28,7 @@ let charData = require(CHAR_DATA_FILE);
 let validCharIds = new Set(charData.characters?.map(char => char.id));
 
 const upload = multer({
-    dest: path.join(CHARACTERS_DIR, 'temp/'),
+    dest: 'uploads/',
     limits: { fileSize: 500000 } // 500KB
 });
 
@@ -159,11 +159,6 @@ app.get('/api/subclasses', async (req, res) => {
     } catch (error) {
         res.status(500).json({ error: 'Failed to load subclasses' });
     }
-});
-
-app.get("/characters/undefined", async (req, res) => {
-    res.status(400).send("Ty durak?");
-    // res.json({'abacaba': 'ty durak?'});
 });
 
 // Get all characters
@@ -442,10 +437,8 @@ app.post('/admin/add', upload.single('image'), async (req, res) => {
     const id = (charId) ? charId : name.toLowerCase().replace(/[^a-z0-9 -]/g, '').replace(/ /g, '_');
     const filename = `${id}.png`;
 
-    // Read existing data
-    const data = await loadCharacters();
     // Check for duplicate id
-    if (data.characters.some(c => c.id === id)) {
+    if (charData.characters.some(c => c.id === id)) {
         return res.status(400).json({ error: 'Character with this name already exists' });
     }
 
@@ -466,13 +459,8 @@ app.post('/admin/add', upload.single('image'), async (req, res) => {
     console.log(finalPath);
 
     // Add new character and update metadata
-    data.characters.push(newChar);
-    await fs.truncate(CHAR_DATA_FILE, 0);
-    await fs.writeFile(CHAR_DATA_FILE, JSON.stringify(data, null, 4));
-    reload_chars();
-
-    console.log(CHAR_DATA_FILE);
-    console.log(JSON.stringify(data));
+    charData.characters.push(newChar);
+    await saveCharacters(charData);
 
     res.json(newChar);
 });
@@ -535,10 +523,6 @@ app.get('/admin/files', adminAuth, async (req, res) => {
         console.error("File scan error", error);
     }
 });
-
-async function loadCharacters() {
-    return JSON.parse(await fs.readFile(CHAR_DATA_FILE)).characters;
-}
 
 async function changeID(characters, originalFile, id) {
     const oldChar = characters.find(c =>
@@ -636,6 +620,12 @@ async function renameFile(originalFile, newFilename) {
     );
 }
 
+async function saveCharacters(characters) {
+    await fs.truncate(CHAR_DATA_FILE, 0);
+    await fs.writeFile(CHAR_DATA_FILE, JSON.stringify(characters, null, 2));
+    reload_chars();
+}
+
 // Update metadata and rename file
 app.post('/admin/update-file', adminAuth, async (req, res) => {
     const { originalFile, id, name, class: charClass, subclass: charSubclass, rarity } = req.body;
@@ -648,7 +638,7 @@ app.post('/admin/update-file', adminAuth, async (req, res) => {
         }
 
         // Read existing data
-        const characters = await loadCharacters();
+        const characters = charData.characters;
         const fileExists = characters.some(c =>
             c.skins.default === originalFile ||
             c.skins.alternates.includes(originalFile)
@@ -690,9 +680,7 @@ app.post('/admin/update-file', adminAuth, async (req, res) => {
             res.status(400).json(status);
         }
         else {
-            await fs.truncate(CHAR_DATA_FILE, 0);
-            await fs.writeFile(CHAR_DATA_FILE, JSON.stringify({ characters: characters }, null, 2));
-            reload_chars();
+            await saveCharacters({ characters: characters });
             res.json({ success: true, newFilename });
         }
     } catch (error) {
@@ -701,24 +689,143 @@ app.post('/admin/update-file', adminAuth, async (req, res) => {
     }
 });
 
+// Upload skin endpoint
+app.post('/admin/upload-skin', adminAuth, upload.single('skin'), async (req, res) => {
+    const { characterId } = req.body;
+
+    try {
+        const character = charData.characters.find(c => c.id === characterId);
+
+        if (!character) {
+            return res.status(404).json({ error: "Character not found" });
+        }
+
+        // Move uploaded file to characters directory
+        const ext = path.extname(req.file.originalname);
+        
+        const newFilename = `${characterId}_skin${character.skins.alternates.length + 1}${ext}`;
+        await fs.rename(
+            req.file.path,
+            path.join(CHARACTERS_DIR, newFilename)
+        );
+
+        // Update character record
+        character.skins.alternates.push(newFilename);
+        character.meta.modified = new Date().toISOString();
+
+        await saveCharacters(charData);
+
+        res.json({
+            success: true,
+            filename: newFilename
+        });
+
+    } catch (error) {
+        console.error('Skin upload failed:', error);
+        res.status(500).json({ error: "Skin upload failed" });
+    }
+});
+
+// Set default skin endpoint
+app.post('/admin/set-default-skin', adminAuth, async (req, res) => {
+    const { characterId, filename } = req.body;
+    const token = req.headers.authorization?.split(' ')[1];
+
+    try {
+        const character = charData.characters.find(c => c.id === characterId);
+
+        if (!character) {
+            return res.status(404).json({ error: "Character not found" });
+        }
+
+        // Validate skin exists
+        if (character.skins.default !== filename &&
+            !character.skins.alternates.includes(filename)) {
+            return res.status(400).json({ error: "Invalid skin file" });
+        }
+
+        // Swap default and previous default
+        const oldDefault = character.skins.default;
+        character.skins.alternates = character.skins.alternates.filter(f => f !== filename);
+        character.skins.alternates.push(oldDefault);
+        character.skins.default = filename;
+        character.meta.modified = new Date().toISOString();
+
+        await saveCharacters(charData);
+
+        res.json({ success: true });
+
+    } catch (error) {
+        console.error('Set default failed:', error);
+        res.status(500).json({ error: "Set default failed" });
+    }
+});
+
 // Delete file
 app.delete('/admin/delete-file', adminAuth, async (req, res) => {
     const { filename } = req.body;
 
     try {
+        // First update metadata
+        let charactersUpdated = false;
+
+        // Find all characters using this file
+        const affectedCharacters = charData.characters.filter(c =>
+            c.skins.default === filename ||
+            c.skins.alternates.includes(filename)
+        );
+
+        for (const char of affectedCharacters) {
+            if (char.skins.default === filename) {
+                // Handle default skin deletion
+                if (char.skins.alternates.length > 0) {
+                    // Promote first alternate to default
+                    char.skins.default = char.skins.alternates.shift();
+                    char.meta.modified = new Date().toISOString();
+                } else {
+                    // Delete character if no alternates left
+                    charData.characters = charData.characters.filter(c => c.id !== char.id);
+                }
+                charactersUpdated = true;
+            } else {
+                // Remove from alternates
+                const index = char.skins.alternates.indexOf(filename);
+                if (index > -1) {
+                    char.skins.alternates.splice(index, 1);
+                    char.meta.modified = new Date().toISOString();
+                    charactersUpdated = true;
+                }
+            }
+        }
+
+        // Delete physical file
         const filePath = path.join(CHARACTERS_DIR, filename);
-        await fs.unlink(filePath);
+        try {
+            await fs.access(filePath, fs.constants.F_OK);
+            await fs.unlink(filePath);
+        } catch (fileError) {
+            if (fileError.code !== 'ENOENT') {
+                throw fileError;
+            }
+        }
 
-        // Remove from metadata
-        const data = require(CHAR_DATA_FILE);
-        data.characters = data.characters.filter(c => c.skins.default !== filename);
-        data.characters = data.characters.filter(c => !(filename in c.skins.alternates));
-        await fs.truncate(CHAR_DATA_FILE, 0);
-        await fs.writeFile(CHAR_DATA_FILE, JSON.stringify(data, null, 2));
+        if (charactersUpdated) {
+            await saveCharacters(charData);
+        }
 
-        res.json({ success: true });
+        res.json({
+            success: true,
+            message: affectedCharacters.length ?
+                'File deleted and metadata updated' :
+                'Orphan file deleted'
+        });
+
     } catch (error) {
-        res.status(500).json({ error: 'File deletion failed' });
+        console.error('Delete error:', error);
+        res.status(500).json({
+            error: 'File deletion failed',
+            details: error.message
+        });
     }
 });
 

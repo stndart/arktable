@@ -230,6 +230,12 @@ button:hover,
     transition: background 0.2s;
 }
 
+.context-item.disabled {
+    color: #999 !important;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
 .context-item:hover {
     background: #f5f5f5;
 }

@@ -48,6 +48,23 @@
     background: #fff8e1;
 }
 
+.file-card.updating {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.file-card.updating::after {
+    content: "Updating...";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #fff;
+    background: rgba(0, 0, 0, 0.8);
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+}
+
 .delete-btn {
     position: absolute;
     top: 8px;

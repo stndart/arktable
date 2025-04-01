@@ -70,9 +70,6 @@ class FileManager {
 
         this.fileGrid = document.getElementById('fileGrid');
         this.editModal = document.getElementById('editModal');
-        this.contextMenu = this.createContextMenu();
-        document.body.appendChild(this.contextMenu);
-        this.setupContextMenu();
         this.init();
     }
 
@@ -91,41 +88,134 @@ class FileManager {
         this.setupModal();
     }
 
-    createContextMenu() {
-        const menu = document.createElement('div');
-        menu.className = 'context-menu';
-        menu.innerHTML = `
-            <div class="menu-item" data-action="remove-index">Remove from index</div>
-        `;
-        return menu;
-    }
-
-    setupContextMenu() {
-        document.addEventListener('contextmenu', (e) => {
-            const fileCard = e.target.closest('.file-card');
-            if (fileCard && !fileCard.classList.contains("unindexed")) {
-                e.preventDefault();
-                this.currentFile = fileCard.querySelector('.delete-btn').dataset.file;
-                this.contextMenu.style.display = 'block';
-                this.contextMenu.style.left = `${e.pageX}px`;
-                this.contextMenu.style.top = `${e.pageY}px`;
-            }
-        });
-
-        this.contextMenu.querySelectorAll('.menu-item').forEach(item => {
+    setupContextMenu(menu) {
+        menu.querySelectorAll('.context-item').forEach(item => {
             item.addEventListener('click', async () => {
                 const action = item.dataset.action;
-                this.contextMenu.style.display = 'none';
+                menu.style.display = 'none';
 
-                if (action === 'remove-index') {
-                    await this.removeIndex();
+                switch (action) {
+                    case 'upload-skin':
+                        this.handleUploadSkin();
+                        break;
+
+                    case 'set-default':
+                        this.handleSetDefault();
+                        break;
                 }
             });
         });
 
-        document.addEventListener('click', () => {
-            this.contextMenu.style.display = 'none';
+        // Close menu on click outside
+        setTimeout(() => {
+            document.addEventListener('click', () => menu.remove(), { once: true });
         });
+    }
+
+    showContextMenu(e, x, y) {
+        // Remove existing menus
+        document.querySelectorAll('.context-menu').forEach(menu => menu.remove());
+
+        const fileCard = e.target.closest('.file-card');
+        if (fileCard && !fileCard.classList.contains("unindexed")) {
+
+            console.log(fileCard);
+            this.currentFile = fileCard.querySelector('.delete-btn').dataset.file;
+            this.currentCharacter = fileCard.dataset.characterId;
+            this.isDefaultSkin = fileCard.dataset.isDefault === 'true';
+
+            const menu = document.createElement('div');
+            menu.className = 'context-menu';
+            menu.style.left = `${x}px`;
+            menu.style.top = `${y}px`;
+
+            menu.innerHTML = `
+            <div class="context-item" data-action="upload-skin">
+                Upload New Skin
+            </div>
+            <div class="context-item" data-action="set-default">
+                Set as Default Skin
+            </div>
+        `;
+
+            // Update menu item states
+            const setDefaultItem = menu.querySelector('[data-action="set-default"]');
+            setDefaultItem.classList.toggle('disabled', this.isDefaultSkin);
+
+            console.log('default?', this.isDefaultSkin);
+
+            document.body.appendChild(menu);
+
+            this.setupContextMenu(menu);
+        }
+    }
+
+    async handleUploadSkin() {
+        const fileCard = document.querySelector(`[data-file="${this.currentFile}"]`);
+        fileCard?.classList.add('updating');
+
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.png';
+        input.onchange = async (e) => {
+            const file = e.target.files[0];
+
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('skin', file);
+            formData.append('characterId', this.currentCharacter);
+
+            try {
+                const response = await fetch('/admin/upload-skin', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${this.adminToken}`
+                    },
+                    body: formData
+                });
+
+                if (!response.ok) throw new Error('Upload failed');
+
+                await this.loadFiles();
+                this.showSuccessMessage('Skin uploaded successfully');
+
+            } catch (error) {
+                this.showErrorMessage(`Upload failed: ${error.message}`);
+            }
+        };
+
+        input.click();
+        fileCard?.classList.remove('updating');
+    }
+
+    async handleSetDefault() {
+        try {
+            const fileCard = document.querySelector(`[data-file="${this.currentFile}"]`);
+            fileCard?.classList.add('updating');
+
+            const response = await fetch('/admin/set-default-skin', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.adminToken}`
+                },
+                body: JSON.stringify({
+                    characterId: this.currentCharacter,
+                    filename: this.currentFile
+                })
+            });
+
+            if (!response.ok) throw new Error('Set default failed');
+
+            await this.loadFiles();
+            this.showSuccessMessage('Default skin updated');
+
+        } catch (error) {
+            this.showErrorMessage(`Set default failed: ${error.message}`);
+        } finally {
+            fileCard?.classList.remove('updating');
+        }
     }
 
     async removeIndex() {
@@ -162,7 +252,9 @@ class FileManager {
         console.log(`rendering ${files.length} files`);
 
         this.fileGrid.innerHTML = files.map(file => `
-            <div class="file-card ${file.indexed ? '' : 'unindexed'}">
+            <div class="file-card ${file.indexed ? '' : 'unindexed'}"
+                    data-character-id="${file.metadata?.id}"
+                    data-is-default="${file.metadata?.skins?.default === file.filename}">
                 <button class="delete-btn" data-file="${file.filename}">&times;</button>
                 <img src="/characters/${file.filename}" 
                      class="file-preview"
@@ -180,7 +272,15 @@ class FileManager {
         // Update event listeners
         document.querySelectorAll('.file-preview').forEach(img => {
             img.addEventListener('click', () => this.showEditModal(img.dataset.file));
+            img.addEventListener('contextmenu', e => {
+                e.preventDefault();
+                const cell = e.target.closest('.file-preview');
+                if (cell) this.showContextMenu(e, e.clientX, e.clientY);
+            });
         });
+
+        // Right-click context menu
+        this.grid
 
         document.querySelectorAll('.delete-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
