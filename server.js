@@ -494,11 +494,8 @@ app.get('/admin/files', adminAuth, async (req, res) => {
         const fileData = await Promise.all(files.map(async (file) => {
             if (!file.endsWith('.png')) return null;
 
-            // console.log(metadata);
-            // console.log(charData.characters);
-
             const stats = await fs.stat(path.join(CHARACTERS_DIR, file));
-            const existing = charData.characters.find(c => c.image === file);
+            const existing = charData.characters.find(c => c.skins?.default === file);
 
             return {
                 filename: file,
@@ -608,6 +605,13 @@ async function updateChar(characters, id, name, charClass, charSubclass, rarity)
     return { success: true };
 }
 
+async function renameFile(originalFile, newFilename) {
+    await fs.rename(
+        path.join(CHARACTERS_DIR, originalFile),
+        path.join(CHARACTERS_DIR, newFilename)
+    );
+}
+
 // Update metadata and rename file
 app.post('/admin/update-file', adminAuth, async (req, res) => {
     const { originalFile, id, name, class: charClass, subclass: charSubclass, rarity } = req.body;
@@ -633,19 +637,19 @@ app.post('/admin/update-file', adminAuth, async (req, res) => {
         if (fileExists && !idExists) {
             // if (originalFile && idExists && idExists.id !== originalFile.replace('.png', '')) { /// TODO: bugged?
             status = await changeID(characters, originalFile, id);
-            console.log("Changing id of {} to {}", originalFile, id)
+            console.log(`Changing id of ${originalFile} to ${id}`);
         }
         // Case a: Add new entry
         if (!fileExists && !idExists) {
             status = await addChar(characters, originalFile, id, name, charClass, charSubclass, rarity);
             newFilename = `${id}.png`;
-            console.log("Added new char {} with id {}", originalFile, id);
+            console.log(`Added new char ${originalFile} with id ${id}`);
         }
         // Case c: Add skin
         if (!fileExists && idExists) {
             status = await addSkin(characters, idExists, originalFile, id, name, charClass, charSubclass, rarity);
             newFilename = originalFile;
-            console.log("Added new skin {} for char id {}", originalFile, id);
+            console.log(`Added new skin ${originalFile} for char id ${id}`);
         }
         // Case b: Update record
         if (fileExists && idExists) {
@@ -654,7 +658,7 @@ app.post('/admin/update-file', adminAuth, async (req, res) => {
                 status = { error: "New id already exists" };
             }
             status = await updateChar(characters, id, name, charClass, charSubclass, rarity);
-            console.log("Updated char entry for char id {}", id);
+            console.log(`Updated char entry for char id ${id}`);
         }
 
         if ('error' in status) {
@@ -682,7 +686,8 @@ app.delete('/admin/delete-file', adminAuth, async (req, res) => {
 
         // Remove from metadata
         const data = require(CHAR_DATA_FILE);
-        data.characters = data.characters.filter(c => c.image !== filename);
+        data.characters = data.characters.filter(c => c.skins.default !== filename);
+        data.characters = data.characters.filter(c => !(filename in c.skins.alternates));
         await fs.truncate(CHAR_DATA_FILE, 0);
         await fs.writeFile(CHAR_DATA_FILE, JSON.stringify(data, null, 2));
 

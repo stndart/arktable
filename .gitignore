@@ -2,11 +2,4 @@
 public/characters/temp/*
 
 # profile cache
-public/data/shared/*
 data/shared/*
-
-# characters images and data
-public/characters/*
-
-# private data
-data/*
