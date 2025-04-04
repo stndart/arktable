@@ -660,13 +660,14 @@ async function updateChar(characters, id, name, charClass, charSubclass, rarity)
 
 async function rename_internal(originalFile, newFilename) {
     // fs.rename(originalFile, newFilename); // missing permissions error
-    fs.copyFile(originalFile, newFilename, (err) => {
-        if (err) throw err;
-        fs.unlink(oldPath, (err) => {
-            if (err) throw err;
-            console.log(`File renamed from ${originalFile} to ${newFilename}`);
-        });
-    });
+    try {
+        await fs.copyFile(originalFile, newFilename);
+        await fs.unlink(originalFile);
+    } catch (error) {
+        console.log(`Failed to rename file from ${originalFile} to ${newFilename}`);
+        return;
+    }
+    console.log(`File renamed from ${originalFile} to ${newFilename}`);
 }
 
 async function renameFile(originalFile, newFilename, basefile = true) {
