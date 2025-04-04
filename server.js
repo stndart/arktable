@@ -455,7 +455,7 @@ app.post('/admin/add', upload.single('image'), async (req, res) => {
 
     // Move and rename uploaded file
     const finalPath = path.join(CHARACTERS_DIR, newChar.image);
-    await fs.rename(req.file.path, finalPath);
+    await renameFile(req.file.path, finalPath, basefile = false);
 
     console.log(req.file.path);
     console.log(finalPath);
@@ -658,11 +658,26 @@ async function updateChar(characters, id, name, charClass, charSubclass, rarity)
     return { success: true };
 }
 
-async function renameFile(originalFile, newFilename) {
-    await fs.rename(
-        path.join(CHARACTERS_DIR, originalFile),
-        path.join(CHARACTERS_DIR, newFilename)
-    );
+async function rename_internal(originalFile, newFilename) {
+    // fs.rename(originalFile, newFilename); // missing permissions error
+    fs.copyFile(originalFile, newFilename, (err) => {
+        if (err) throw err;
+        fs.unlink(oldPath, (err) => {
+            if (err) throw err;
+            console.log(`File renamed from ${originalFile} to ${newFilename}`);
+        });
+    });
+}
+
+async function renameFile(originalFile, newFilename, basefile = true) {
+    if (basefile) {
+        await rename_internal(
+            path.join(CHARACTERS_DIR, originalFile),
+            path.join(CHARACTERS_DIR, newFilename)
+        );
+    } else {
+        await rename_internal(originalFile, newFilename);
+    }
 }
 
 async function saveCharacters(characters) {
@@ -751,9 +766,10 @@ app.post('/admin/upload-skin', adminAuth, upload.single('skin'), async (req, res
         const ext = path.extname(req.file.originalname);
 
         const newFilename = `${characterId}_skin${character.skins.alternates.length + 1}${ext}`;
-        await fs.rename(
+        await renameFile(
             req.file.path,
-            path.join(CHARACTERS_DIR, newFilename)
+            path.join(CHARACTERS_DIR, newFilename),
+            basename = false
         );
 
         // Update character record
