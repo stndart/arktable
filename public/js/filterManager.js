@@ -35,6 +35,8 @@ class FilterManager {
     createFilterOptions(filterName, values = []) {
         this.filters[filterName] = { state: 'neutral', mode: values.length == 0 ? 'tristate' : 'twostate', values: [] };
 
+        if (['class', 'rarity', 'indexed'].includes(filterName))
+            return;
         const container = document.getElementById('extraFilters');
         values.forEach(value => {
             const option = document.createElement('div');
@@ -214,18 +216,32 @@ class FilterManager {
 
     renderAllFilterStates() {
         Object.entries(this.filters).forEach(([filterName, filter]) => {
-            const item = document.querySelector(`.filter-item[data-filter="${filterName}"]`);
-            if (item) {
-                this.renderFilterState(item, filter.state);
-            }
+            const items = document.querySelectorAll(`
+                .filter-item[data-filter="${filterName}"],
+                .class-filter-item[data-filter="${filterName}"]
+            `);
+            items.forEach((item) => {
+                // Determine state based on filter mode
+                let state;
+                if (filter.mode === 'twostate') { // Group with multiple values
+                    const value = item.dataset.value;
+                    state = filter.values.includes(value) ? 'forced' : 'neutral';
+                } else { // Tristate filters like indexed
+                    state = filter.state;
+                }
+                this.renderFilterState(item, state);
+            });
         });
         this.updateSelectedFiltersDisplay();
     }
 
     renderFilterState(item, state) {
         item.dataset.state = state;
-        item.querySelector('.filter-toggle').textContent =
-            state === 'forced' ? '✓' : state === 'discarded' ? '✕' : '○';
+        const toggle = item.querySelector('.filter-toggle');
+        if (toggle) {
+          toggle.textContent = state === 'forced' 
+            ? '✓' : state === 'discarded' ? '✕' : '○';
+        }
     }
 
     renderClassFilterState(item, state) {
@@ -260,7 +276,7 @@ class FilterManager {
     updateSelectedFiltersDisplay() {
         const container = document.getElementById('selectedFilters');
         container.innerHTML = Object.entries(this.filters)
-            .filter(([_, filter]) => filter.values.length > 0)
+            .filter(([filterName, filter]) => filter.values.length > 0 && !['class', 'indexed', 'rarity'].includes(filterName))
             .map(([name, filter]) =>
                 filter.values.map(value => `
             <div class="filter-item" data-filter="${name}" data-value="${value}">
