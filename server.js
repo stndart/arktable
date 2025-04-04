@@ -635,10 +635,41 @@ async function addSkin(characters, idExists, originalFile, id, name, charClass, 
     //     return { error: "Field mismatch for skin addition" };
     // }
 
-    idExists.skins.alternates.push(originalFile);
-    idExists.meta.modified = new Date().toISOString();
-    saveCharacters({ characters: characters });
-    return { success: true };
+    let usedNumbers = [];
+    for (const alt of idExists.skins.alternates) {
+        const match = alt.match(/_skin(\d+)\.png$/);
+        if (match) {
+            usedNumbers.push(parseInt(match[1], 10));
+        }
+    }
+
+    let nextNumber = 1;
+    while (usedNumbers.includes(nextNumber)) {
+        nextNumber++;
+    }
+
+    const newFilename = `${id}_skin${nextNumber}.png`;
+    
+    // Rename the file and handle errors
+    let success = true;
+    let error;
+    try {
+        await renameFile(originalFile, newFilename);
+    } catch (err) {
+        success = false;
+        error = err;
+    }
+
+    if (success) {
+        idExists.skins.alternates.push(newFilename); // Use the new filename
+        idExists.meta.modified = new Date().toISOString();
+        await saveCharacters({ characters: characters });
+    } else {
+        console.log(`Failed to rename skin file from ${originalFile} to ${newFilename}: ${error.message}`);
+        return { error: `Failed to rename skin file: ${error.message}` };
+    }
+
+    return { success: true, newFilename: newFilename };
 }
 
 async function updateChar(characters, id, name, charClass, charSubclass, rarity) {
@@ -724,9 +755,9 @@ app.post('/admin/update-file', adminAuth, async (req, res) => {
         }
         // Case c: Add skin
         if (!fileExists && idExists) {
-            status = await addSkin(characters, idExists, originalFile, id, name, charClass, charSubclass, rarity);
-            newFilename = originalFile;
-            console.log(`Added new skin ${originalFile} for char id ${id}`);
+            const { newstatus, newFilename } = await addSkin(characters, idExists, originalFile, id, name, charClass, charSubclass, rarity);
+            status = newstatus;
+            console.log(`Added new skin ${newFilename} for char id ${id}`);
         }
         // Case b: Update record
         if (fileExists && idExists) {
