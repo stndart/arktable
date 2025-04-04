@@ -533,29 +533,57 @@ async function changeID(characters, originalFile, id) {
     if (!oldChar) {
         return { error: "Original file not found" };
     }
+    // Move all skins to new ID and collect errors
+    let success = true;
+    const errors = [];
+    const newSkins = {
+        default: '',
+        alternates: []
+    };
 
-    // Move all skins to new ID
+    try {
+        // Rename default skin first
+        const newDefaultName = `${id}.png`;
+        await renameFile(oldChar.skins.default, newDefaultName);
+        newSkins.default = newDefaultName;
+
+        // Process alternate skins with sequential numbering
+        for (let i = 0; i < oldChar.skins.alternates.length; i++) {
+            const altSkin = oldChar.skins.alternates[i];
+            const newName = `${id}_skin${i + 1}.png`;
+            await renameFile(altSkin, newName);
+            newSkins.alternates.push(newName);
+        }
+    } catch (err) {
+        success = false;
+        errors.push(`Failed to rename skins: ${err.message}`);
+    }
+
+    // Prepare new character entry with updated filenames
     const newChar = {
         ...oldChar,
         id,
-        skins: oldChar.skins,
+        skins: newSkins,
         meta: {
             ...oldChar.meta,
             modified: new Date().toISOString()
         }
     };
 
-    // Remove old character
-    characters = characters.filter(c => c.id !== oldChar.id);
-    characters.push(newChar);
+    console.log('Starting ID change for:', oldChar.id, 'to', id);
+    if (success) {
+        // Remove old character and add the new one only on success
+        characters = characters.filter(c => c.id !== oldChar.id);
+        characters.push(newChar);
+        console.log('ID changed successfully to:', id);
+        await saveCharacters({ characters: characters });
+    } else {
+        console.error('Error during ID change:', errors.join('\n'));
+        return { error: errors.join('\n') };
+    }
 
-    // Rename files
-    await renameFile(oldChar.skins.default, `${id}.png`);
-    await Promise.all(oldChar.skins.alternates.map(async (skin, index) => {
-        await renameFile(skin, `${id}_skin${index + 1}.png`);
-    }));
+    return { success: success };
 
-    return { success: true };
 }
 
 async function addChar(characters, originalFile, id, name, charClass, charSubclass, rarity) {
@@ -574,9 +602,22 @@ async function addChar(characters, originalFile, id, name, charClass, charSubcla
             modified: new Date().toISOString()
         }
     };
-    await renameFile(originalFile, `${id}.png`);
-    characters.push(newChar);
-    return { success: true };
+    let success = true;
+    let error;
+    try {
+        await renameFile(originalFile, `${id}.png`);
+    } catch (err) {
+        success = false;
+        error = err;
+    }
+
+    if (success) {
+        characters.push(newChar);
+        await saveCharacters({ characters: characters });
+    } else {
+        return { error: error };
+    }
+    return { success: success };
 }
 
 async function addSkin(characters, idExists, originalFile, id, name, charClass, charSubclass, rarity) {
@@ -594,6 +635,7 @@ async function addSkin(characters, idExists, originalFile, id, name, charClass, 
 
     idExists.skins.alternates.push(originalFile);
     idExists.meta.modified = new Date().toISOString();
+    saveCharacters({ characters: characters });
     return { success: true };
 }
 
@@ -610,6 +652,7 @@ async function updateChar(characters, id, name, charClass, charSubclass, rarity)
             modified: new Date().toISOString()
         }
     };
+    saveCharacters({ characters: characters });
     return { success: true };
 }
 
@@ -639,19 +682,21 @@ app.post('/admin/update-file', adminAuth, async (req, res) => {
 
         // Read existing data
         const characters = charData.characters;
-        const fileExists = characters.some(c =>
+        // character with given file (undefined if file is unindexed)
+        const fileExists = characters.find(c =>
             c.skins.default === originalFile ||
             c.skins.alternates.includes(originalFile)
         );
+        // character with given id (id is undefined when unindexed, hence idExists is undefined when unindexed)
         const idExists = characters.find(c => c.id === id);
 
         let status = { success: false };
-        let newFilename;
+        let newFilename = "";
         // Case d: Change ID
         if (fileExists && !idExists) {
             // if (originalFile && idExists && idExists.id !== originalFile.replace('.png', '')) { /// TODO: bugged?
             status = await changeID(characters, originalFile, id);
-            console.log(`Changing id of ${originalFile} to ${id}`);
+            console.log(`Changed id of ${originalFile} to ${id}`);
         }
         // Case a: Add new entry
         if (!fileExists && !idExists) {
@@ -667,12 +712,13 @@ app.post('/admin/update-file', adminAuth, async (req, res) => {
         }
         // Case b: Update record
         if (fileExists && idExists) {
-            if (fileExists.id !== idExists.id) {
+            if (fileExists.id !== idExists.id) { // attempt to change id (case d)
                 console.log("New id already exists");
                 status = { error: "New id already exists" };
+            } else {
+                status = await updateChar(characters, id, name, charClass, charSubclass, rarity);
+                console.log(`Updated char entry for char id ${id}`);
             }
-            status = await updateChar(characters, id, name, charClass, charSubclass, rarity);
-            console.log(`Updated char entry for char id ${id}`);
         }
 
         if ('error' in status) {
@@ -680,7 +726,6 @@ app.post('/admin/update-file', adminAuth, async (req, res) => {
             res.status(400).json(status);
         }
         else {
-            await saveCharacters({ characters: characters });
             res.json({ success: true, newFilename });
         }
     } catch (error) {
@@ -702,7 +747,7 @@ app.post('/admin/upload-skin', adminAuth, upload.single('skin'), async (req, res
 
         // Move uploaded file to characters directory
         const ext = path.extname(req.file.originalname);
-        
+
         const newFilename = `${characterId}_skin${character.skins.alternates.length + 1}${ext}`;
         await fs.rename(
             req.file.path,
