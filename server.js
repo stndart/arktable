@@ -756,7 +756,7 @@ app.post('/admin/update-file', adminAuth, async (req, res) => {
         // Case c: Add skin
         if (!fileExists && idExists) {
             const { newstatus, newFilename } = await addSkin(characters, idExists, originalFile, id, name, charClass, charSubclass, rarity);
-            status = newstatus;
+            if (newstatus) status = newstatus;
             console.log(`Added new skin ${newFilename} for char id ${id}`);
         }
         // Case b: Update record
