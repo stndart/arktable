@@ -113,7 +113,7 @@ const auth = async (req, res, next) => {
 
         if (!user) {
             res.status(401).json({ error: 'Unauthorized' });
-            console.log("User not found:", user);
+            console.warn("User not found:", user);
             return;
         }
 
@@ -121,7 +121,7 @@ const auth = async (req, res, next) => {
         next();
     } catch (error) {
         res.status(401).json({ error: 'Unauthorized' });
-        console.log("Unauthorized:", error);
+        console.warn("Unauthorized:", error);
     }
 };
 
@@ -169,7 +169,7 @@ app.get('/api/characters', async (req, res) => {
         res.json({ characters: sortedCharacters });
     } catch (error) {
         res.status(500).send('Error loading characters');
-        console.log(error);
+        console.error(`Error loading characters: ${error}`);
     }
 });
 
@@ -255,7 +255,7 @@ app.post('/api/register', async (req, res) => {
         const users = await getUsers();
 
         if (users.some(u => u.email === email)) {
-            console.log("400: Email already exists");
+            console.warn("400: Email already exists");
             return res.status(400).json({ error: 'Email already exists' });
         }
 
@@ -342,7 +342,7 @@ app.get('/api/profile', auth, async (req, res) => {
         res.json(JSON.parse(data));
     } catch (error) {
         res.status(404).json({ error: 'Profile not found' });
-        console.log("Profile not found", error);
+        console.warn(`Profile ${req.user.id} not found`, error);
     }
 });
 
@@ -358,7 +358,7 @@ app.post('/api/save', async (req, res) => { // security disabled for now
 
     } catch (error) {
         res.status(500).json({ error: 'Save failed' });
-        console.log('Save failed', error);
+        console.error('Save failed', error);
     }
 });
 
@@ -375,7 +375,7 @@ app.post('/api/save-shared', async (req, res) => {
 
     } catch (error) {
         res.status(500).json({ error: 'Shared save failed' });
-        console.log('Shared save failed', error);
+        console.error('Shared save failed', error);
     }
 });
 
@@ -431,7 +431,7 @@ app.post('/admin/add', upload.single('image'), async (req, res) => {
     console.log("admin add");
     const token = req.headers.authorization?.split(' ')[1];
     if (token !== process.env.ADMIN_TOKEN) {
-        console.log("unauthorized")
+        console.warn("unauthorized")
         return res.status(403).send('Unauthorized');
     }
 
@@ -665,7 +665,7 @@ async function addSkin(characters, idExists, originalFile, id, name, charClass, 
         idExists.meta.modified = new Date().toISOString();
         await saveCharacters({ characters: characters });
     } else {
-        console.log(`Failed to rename skin file from ${originalFile} to ${newFilename}: ${error.message}`);
+        console.error(`Failed to rename skin file from ${originalFile} to ${newFilename}: ${error.message}`);
         return { error: `Failed to rename skin file: ${error.message}` };
     }
 
@@ -695,7 +695,7 @@ async function rename_internal(originalFile, newFilename) {
         await fs.copyFile(originalFile, newFilename);
         await fs.unlink(originalFile);
     } catch (error) {
-        console.log(`Failed to rename file from ${originalFile} to ${newFilename}: ${error}`);
+        console.error(`Failed to rename file from ${originalFile} to ${newFilename}: ${error}`);
         return;
     }
     console.log(`File renamed from ${originalFile} to ${newFilename}`);
@@ -725,7 +725,7 @@ app.post('/admin/update-file', adminAuth, async (req, res) => {
     try {
         // Validate ID format
         if (!/^[_a-z0-9\-]+$/.test(id)) {
-            console.log("Error updating file: bad id", id);
+            console.error("Error updating file: bad id", id);
             return res.status(400).json({ error: 'ID must be lowercase alphanumeric' });
         }
 
@@ -762,7 +762,7 @@ app.post('/admin/update-file', adminAuth, async (req, res) => {
         // Case b: Update record
         if (fileExists && idExists) {
             if (fileExists.id !== idExists.id) { // attempt to change id (case d)
-                console.log("New id already exists");
+                console.warn("New id already exists");
                 status = { error: "New id already exists" };
             } else {
                 status = await updateChar(characters, id, name, charClass, charSubclass, rarity);
@@ -771,14 +771,14 @@ app.post('/admin/update-file', adminAuth, async (req, res) => {
         }
 
         if ('error' in status) {
-            console.log("update file failed:", status);
+            console.error("update file failed:", status);
             res.status(400).json(status);
         }
         else {
             res.json({ success: true, newFilename });
         }
     } catch (error) {
-        console.log("Error updating file", error);
+        console.error("Error updating file", error);
         res.status(500).json({ error: 'File update failed' });
     }
 });
