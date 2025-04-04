@@ -164,7 +164,9 @@ app.get('/api/subclasses', async (req, res) => {
 // Get all characters
 app.get('/api/characters', async (req, res) => {
     try {
-        res.json(charData);
+        // Sort charData by id before sending
+        const sortedCharacters = charData.characters.sort((a, b) => a.id.localeCompare(b.id));
+        res.json({ characters: sortedCharacters });
     } catch (error) {
         res.status(500).send('Error loading characters');
         console.log(error);
