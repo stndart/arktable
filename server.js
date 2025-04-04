@@ -695,7 +695,7 @@ async function rename_internal(originalFile, newFilename) {
         await fs.copyFile(originalFile, newFilename);
         await fs.unlink(originalFile);
     } catch (error) {
-        console.log(`Failed to rename file from ${originalFile} to ${newFilename}`);
+        console.log(`Failed to rename file from ${originalFile} to ${newFilename}: ${error}`);
         return;
     }
     console.log(`File renamed from ${originalFile} to ${newFilename}`);
