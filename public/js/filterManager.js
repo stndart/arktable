@@ -23,7 +23,7 @@ class FilterManager {
         this.createFilterOptions('indexed');
 
         // Add individual rarity filters
-        this.createFilterOptions('rarity', ['4', '5', '6']);
+        this.createFilterOptions('rarity', ['2', '3', '4', '5', '6']);
 
         // Add class filters
         this.createFilterOptions('class', ['caster', 'defender', 'guard', 'medic', 'sniper', 'specialist', 'supporter', 'vanguard']);
