@@ -1,4 +1,3 @@
-
 /* Admin filter panel */
 .filter-panel {
     position: sticky;
@@ -215,11 +214,13 @@
     height: auto;
     max-width: 100%;
     max-height: 100%;
-    padding: 0; /* Remove previous padding */
+    padding: 0;
+    /* Remove previous padding */
     filter: invert(1);
     object-fit: contain;
-    position: static; /* Remove absolute positioning */
-  }
+    position: static;
+    /* Remove absolute positioning */
+}
 
 /* Filter states */
 .class-filter-item[data-state="forced"] {
@@ -244,14 +245,129 @@
 }
 
 @media (max-width: 768px) {
+
+    /* Main filter panel alignment */
+    .filter-group {
+        align-items: flex-start;
+        padding: 0.5rem 1rem;
+        gap: 0.75rem;
+    }
+
+    /* Filter subgroups (rarity/class) */
+    .filter-subgroup {
+        flex-direction: column;
+        align-items: flex-start;
+        width: 100%;
+        padding: 0;
+        background: none;
+    }
+
+    /* Filter group labels */
+    .filter-label {
+        margin: 0 0 0.25rem 0;
+        font-size: 0.9em;
+        color: #444;
+    }
+
+    .filter-subgroup .filter-label {
+        width: 100%;
+        margin-bottom: 0.5rem;
+    }
+
+    /* Rarity filter row */
+    .filter-subgroup:has(.filter-item[data-filter^="rarity"]) {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    /* Rarity filter items */
+    .filter-item[data-filter^="rarity"] {
+        padding: 0.25rem 0.8rem;
+        font-size: 0.9em;
+        gap: 0.25rem;
+    }
+
+    /* Hide toggle circles on mobile for rarity */
+    .filter-item[data-filter^="rarity"] .filter-toggle {
+        display: none;
+    }
+
+    /* Force single line without scroll */
+    .class-filter-scroll-wrapper {
+        overflow: hidden;
+        padding-right: 32px;
+    }
+
+    .class-filter-container {
+        padding: 4px 0;
+        margin: 0;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        gap: 4px;
+        /* Compensate for negative margin */
+        width: calc(100% + 16px);
+        margin-right: -8px;
+        padding-right: 8px;
+    }
+
+    /* Class filter items */
     .class-filter-item {
-        width: 36px;
+        width: calc(12.5% - 5px);
+        margin-right: 1px;
+        /* 8 items per row accounting for gap */
+        height: auto;
+        min-width: 32px;
+        /* Minimum size */
+        aspect-ratio: 1;
+        /* Maintain square shape */
+        flex-shrink: 1;
+        /* Allow shrinking */
+        padding: 2px;
+    }
+
+    /* Disable hover effects on mobile */
+    .class-filter-item:hover {
+        transform: none !important;
+        margin: 0 !important;
+        box-shadow: none !important;
+    }
+
+    /* Adjust class icon sizing */
+    .class-icon {
+        max-width: 24px;
+        max-height: 24px;
+    }
+
+    /* Search filter adjustments */
+    .filter-search-wrapper {
+        width: 100%;
+        padding: 0;
+    }
+
+    .filter-search {
+        width: 100%;
+        margin: 0;
         height: 36px;
     }
 
-    .filter-subgroup.class-filters {
-        margin: 8px -16px;
-        padding: 8px 16px;
-        border-radius: 0;
+    /* Horizontal layout for rarity filters */
+    .filter-subgroup:has(.filter-item[data-filter^="rarity"]) {
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 0.25rem;
+    }
+
+    /* State colors for rarity filters */
+    .filter-item[data-filter^="rarity"][data-state="forced"] {
+        background: #c8e6c9 !important;
+    }
+
+    .filter-item[data-filter^="rarity"][data-state="discarded"] {
+        background: #ffcdd2 !important;
+    }
+
+    /* Indexed filter alignment */
+    .filter-item[data-filter="indexed"] {
+        margin-right: auto;
     }
 }
