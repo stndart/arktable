@@ -8,6 +8,14 @@ class GridManager {
         this.isPersistentShare = window.location.pathname.startsWith('/shared/user/');
         this.shareId = this.getShareIdFromURL();
 
+        this.longPressTimer = null;
+        this.touchStartX = 0;
+        this.touchStartY = 0;
+        this.isDrag = false;
+        this.preventDrag = false;
+        this.DRAG_THRESHOLD = 16; // Minimum movement in pixels to consider it a drag
+        this.LONG_PRESS_DURATION = 1200; // ms
+
         this.isEditable = !this.isSharedPage;
         if (this.isSharedPage) {
             const params = new URLSearchParams(window.location.search);
@@ -48,6 +56,10 @@ class GridManager {
 
         this.shareManager = new ShareManager(this);
         this.filterManager = new FilterManager(this);
+    }
+
+    isMobileDevice() {
+        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     }
 
     async init_basic() {
@@ -173,10 +185,77 @@ class GridManager {
     }
 
     setupCoreEvents() {
-        // Drag & Drop
-        this.grid.addEventListener('dragstart', this.handleDragStart.bind(this));
-        this.grid.addEventListener('dragover', this.handleDragOver.bind(this));
-        this.grid.addEventListener('dragend', this.handleDragEnd.bind(this));
+        // Add touch event listeners for mobile
+        // if ('ontouchstart' in window) {
+        if (this.isMobileDevice()) {
+            this.grid.addEventListener('touchstart', this.handleTouchStart.bind(this));
+            this.grid.addEventListener('touchmove', this.handleTouchMove.bind(this));
+            this.grid.addEventListener('touchend', this.handleTouchEnd.bind(this));
+        }
+        else {
+            // Keep existing desktop drag events
+            this.grid.addEventListener('dragstart', this.handleDragStart.bind(this));
+            this.grid.addEventListener('dragover', this.handleDragOver.bind(this));
+            this.grid.addEventListener('dragend', this.handleDragEnd.bind(this));
+        }
+    }
+
+    handleTouchStart(e) {
+        if (!this.isEditable) return;
+
+        const touch = e.touches[0];
+        const cell = touch.target.closest('.character-cell');
+        if (!cell) return;
+
+        this.touchStartX = touch.clientX;
+        this.touchStartY = touch.clientY;
+        this.isDrag = false;
+        this.preventDrag = false;
+
+        // Start long press timer
+        this.longPressTimer = setTimeout(() => {
+            if (!this.isDrag) {
+                console.log('touch tieout', this.LONG_PRESS_DURATION);
+                this.preventDrag = true;
+                this.showContextMenu(cell, touch.clientX, touch.clientY);
+            }
+        }, this.LONG_PRESS_DURATION);
+    }
+
+    handleTouchMove(e) {
+        if (!this.longPressTimer || this.preventDrag) return;
+
+        const touch = e.touches[0];
+        const deltaX = Math.abs(touch.clientX - this.touchStartX);
+        const deltaY = Math.abs(touch.clientY - this.touchStartY);
+
+        // If movement exceeds threshold, cancel context menu and start drag
+        if (deltaX > this.DRAG_THRESHOLD || deltaY > this.DRAG_THRESHOLD) {
+            clearTimeout(this.longPressTimer);
+            this.longPressTimer = null;
+            this.isDrag = true;
+
+            // Trigger drag initialization
+            const cell = e.target.closest('.character-cell');
+            if (cell) {
+                this.handleDragStart({
+                    target: cell,
+                    preventDefault: () => { },
+                    dataTransfer: { setData: () => { } }
+                });
+            }
+        }
+    }
+
+    handleTouchEnd(e) {
+        clearTimeout(this.longPressTimer);
+        this.longPressTimer = null;
+
+        if (this.isDrag) {
+            // Complete the drag operation
+            this.handleDragEnd(e);
+            this.isDrag = false;
+        }
     }
 
     setupControlButtons() {
@@ -201,7 +280,10 @@ class GridManager {
 
         // Check marks
         this.grid.addEventListener('click', this.handleToggleBound);
+        this.setupContextMenu();
+    }
 
+    setupContextMenu() {
         // Right-click context menu
         this.grid.addEventListener('contextmenu', e => {
             e.preventDefault();
@@ -539,6 +621,8 @@ class GridManager {
     }
 
     showContextMenu(cell, x, y) {
+        this.preventDrag = true;
+
         // Remove existing menus
         document.querySelectorAll('.context-menu').forEach(menu => menu.remove());
 
