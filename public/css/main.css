@@ -1,9 +1,4 @@
 /* Base Styles */
-/* :root {
-    --button-font: 16px Arial, sans-serif;
-    --button-padding: 8px 16px;
-    --button-bg: #4CAF50;
-} */
 
 body {
     font-family: 'Arial', sans-serif;
@@ -45,6 +40,7 @@ body {
 }
 
 .character-cell {
+    touch-action: pan-y; /* Allow vertical scrolling */
     position: relative;
     padding-top: 100%;
     background: transparent;
@@ -54,6 +50,11 @@ body {
     border-radius: 8px;
     transition: transform 0.3s ease, opacity 0.2s ease;
     will-change: transform;
+    /* dragging smth */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-user-drag: none;
+    user-select: none;
+    -webkit-touch-callout: none;
 }
 
 .dragging {
@@ -70,7 +71,6 @@ body {
 
 @media (max-width: 768px) {
     .character-cell {
-        touch-action: none; /* Prevent scrolling while dragging */
         user-select: none;  /* Disable text selection */
     }
     
@@ -89,6 +89,9 @@ body {
     object-fit: contain;
     pointer-events: none;
     /* Prevent images from blocking drag events */
+    -webkit-user-drag: none;
+    user-select: none;
+    -webkit-touch-callout: none;
 }
 
 /* Overlay Elements */
@@ -171,10 +174,6 @@ button,
     color: white;
     cursor: pointer;
     transition: opacity 0.2s;
-}
-
-button:hover {
-    opacity: 0.9;
 }
 
 /* Import Button */
@@ -280,31 +279,6 @@ button:hover,
     }
 }
 
-/* Admin Panel */
-.admin-form {
-    max-width: 500px;
-    margin: 20px auto;
-    padding: 20px;
-    background: white;
-    border-radius: 8px;
-}
-
-.form-group {
-    margin-bottom: 15px;
-}
-
-.form-group label {
-    display: block;
-    margin-bottom: 5px;
-}
-
-.form-group input {
-    width: 100%;
-    padding: 8px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-}
-
 /* Delete mode indicators */
 .destruction-off {
     background: #4CAF50 !important;
@@ -363,22 +337,6 @@ button:hover,
 }
 
 /* Add share dialog styles */
-.share-type {
-    padding: 10px;
-    border-radius: 4px;
-    margin: 10px 0;
-}
-
-.share-type.persistent {
-    background: #e3f2fd;
-    color: #1976d2;
-}
-
-.share-type.snapshot {
-    background: #fff3e0;
-    color: #ef6c00;
-}
-
 .notice {
     font-size: 0.9em;
     color: #666;

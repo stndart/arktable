@@ -221,21 +221,29 @@ class GridManager {
             }
         }, this.LONG_PRESS_DURATION);
     }
-
+    
     handleTouchMove(e) {
         if (!this.longPressTimer || this.preventDrag) return;
 
+        e.preventDefault(); // Add this line
+    
         const touch = e.touches[0];
         const deltaX = Math.abs(touch.clientX - this.touchStartX);
         const deltaY = Math.abs(touch.clientY - this.touchStartY);
-
-        // If movement exceeds threshold, cancel context menu and start drag
+    
+        // Clear long-press timer on any movement
+        if (deltaX > 0 || deltaY > 0) {
+            clearTimeout(this.longPressTimer);
+            this.longPressTimer = null;
+        }
+    
+        // Check if movement exceeds drag threshold
         if (deltaX > this.DRAG_THRESHOLD || deltaY > this.DRAG_THRESHOLD) {
+            e.preventDefault(); // Prevent scrolling when drag starts
             clearTimeout(this.longPressTimer);
             this.longPressTimer = null;
             this.isDrag = true;
-
-            // Trigger drag initialization
+    
             const cell = e.target.closest('.character-cell');
             if (cell) {
                 this.handleDragStart({
@@ -617,15 +625,18 @@ class GridManager {
     }
 
     showContextMenu(cell, x, y) {
-        // this.preventDrag = true;
-        
-        // Keep selection prevention but allow touch events
-        menu.onselectstart = () => false;
+        if (this.preventDrag) {
+            // Allow native scrolling when context menu is active
+            return;
+        }
 
         // Remove existing menus
         document.querySelectorAll('.context-menu').forEach(menu => menu.remove());
 
         const menu = document.createElement('div');
+
+        // Keep selection prevention but allow touch events
+        menu.onselectstart = () => false;
         menu.className = 'context-menu';
         menu.style.left = `${x}px`;
         menu.style.top = `${y}px`;
