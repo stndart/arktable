@@ -258,6 +258,7 @@ button:hover,
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
         border-radius: 8px;
         z-index: 1000;
+        touch-action: pan-y !important;
     }
 
     .context-item {
@@ -265,6 +266,9 @@ button:hover,
         font-size: 16px;
         border-bottom: 1px solid #eee;
         user-select: none;  /* Disable text selection */
+        
+        -webkit-touch-callout: none;
+        touch-action: manipulation;
     }
 
     .context-item:last-child {

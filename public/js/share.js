@@ -120,14 +120,6 @@ class ShareManager {
             document.getElementById(id).style.display = this.gridManager.isEditable ? '' : 'none';
         });
 
-        document.getElementById('save').style.display = 'none';
-        if (this.gridManager.isEditable) {
-            document.getElementById('save').style.display = 'block';
-            document.getElementById('save').addEventListener('click', () => {
-                this.gridManager.saveState();
-            });
-        }
-
         // Enable editing features
         if (this.gridManager.isEditable) {
             this.gridManager.enableEditMode();

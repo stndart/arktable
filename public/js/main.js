@@ -263,10 +263,6 @@ class GridManager {
         this.removeControlListeners();
 
         // Control Buttons
-        if (!this.isSharedPage) { // to avoid overwrite local save
-            document.getElementById('save').addEventListener('click', () => this.saveState());
-        }
-
         this.deleteBtn = document.getElementById('deleteMode');
         this.deleteBtn.addEventListener('click', () => this.toggleDeleteMode());
 
@@ -590,7 +586,7 @@ class GridManager {
             const index = this.trueState.layout.indexOf(cell.dataset.id);
             if (index !== -1) {
                 this.trueState.layout.splice(index, 1);
-                this.trueState.marks.splice(index, 1);
+                delete this.trueState.marks[cell.dataset.id];
             }
 
             this.saveState();
@@ -608,7 +604,7 @@ class GridManager {
             const cell = this.createCharacterCell(character);
             this.grid.appendChild(cell);
             this.trueState.layout.push(character.id);
-            this.trueState.marks.push({ checks: false, marks: 0 });
+            this.trueState.marks[character.id] = { checks: false, marks: 0 };
             this.saveState();
         }
     }
@@ -621,7 +617,10 @@ class GridManager {
     }
 
     showContextMenu(cell, x, y) {
-        this.preventDrag = true;
+        // this.preventDrag = true;
+        
+        // Keep selection prevention but allow touch events
+        menu.onselectstart = () => false;
 
         // Remove existing menus
         document.querySelectorAll('.context-menu').forEach(menu => menu.remove());
