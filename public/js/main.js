@@ -285,6 +285,8 @@ class GridManager {
         // Check marks
         this.grid.addEventListener('click', this.handleToggleBound);
         this.setupContextMenu();
+        
+        document.getElementById('randomOperator').addEventListener('click', () => {this.showRandomOperator()});
     }
 
     setupContextMenu() {
@@ -761,6 +763,58 @@ class GridManager {
 
         this.trueState.marks[charId].circles = circles.filter(circle => circle.classList.contains('show')).length;
         this.saveState();
+    }
+
+    showRandomOperator() {
+        // Remove existing popup first
+        const existingPopup = document.querySelector('.random-popup');
+        if (existingPopup) {
+            existingPopup.classList.add('fading-out');
+            setTimeout(() => existingPopup.remove(), 300);
+        }
+
+        // Get currently visible operators
+        const availableOperators = this.filteredFiles.filter(file => this.trueState.layout.includes(file.metadata.id));
+        
+        if (availableOperators.length === 0) {
+            this.showError('No operators available in current view');
+            return;
+        }
+
+        // Pick random operator
+        const randomIndex = Math.floor(Math.random() * availableOperators.length);
+        const operator = availableOperators[randomIndex];
+        const character = this.characterMap.get(operator.metadata.id);
+
+        // Create popup
+        const popup = document.createElement('div');
+        popup.className = 'random-popup';
+        popup.innerHTML = `
+            <button class="close-popup">&times;</button>
+            <img src="/characters/${character.skins.default}" 
+                 alt="${character.name}" 
+                 class="random-operator-image">
+            <p class="operator-name">${character.name}</p>
+        `;
+
+        // Add close functionality
+        popup.querySelector('.close-popup').addEventListener('click', () => popup.remove());
+        popup.addEventListener('click', (e) => {
+            if (e.target === popup) popup.remove();
+        });
+
+        document.body.appendChild(popup);
+
+    // Create popup with fade-in class
+    popup.classList.add('fading-in');
+    
+    // Update auto-close to handle animation
+    this.randomPopupTimeout = setTimeout(() => {
+        if (document.body.contains(popup)) {
+            popup.classList.add('fading-out');
+            setTimeout(() => popup.remove(), 300);
+        }
+    }, 5000);
     }
 
     async loadProfile() {
