@@ -120,17 +120,26 @@ class FilterManager {
     }
 
     updateFilterState(filterName, newState) {
-        // console.log("update filter", filterName, newState);
+        try {
+            if (!this.filters[filterName]) {
+                console.error(`Filter ${filterName} not found`);
+                return;
+            }
 
-        this.filters[filterName].state = newState;
-        this.applyFilters();
-        this.saveFilterState();
+            this.filters[filterName].state = newState;
+            this.applyFilters();
+            this.saveFilterState();
+        } catch (error) {
+            console.error('Error updating filter state:', error);
+        }
     }
 
     filterOut(originalFiles) {
+        if (!originalFiles || !originalFiles.length) return [];
+
         return originalFiles.filter(file => {
             return Object.entries(this.filters).every(([filterName, filter]) => {
-                if (filter === 'neutral') return true;
+                if (!filter || filter.state === 'neutral') return true;
 
                 const fileValue = this.getFileValue(filterName, file);
 
@@ -151,6 +160,8 @@ class FilterManager {
     }
 
     applyFilters() {
+        if (!this.fileManager.originalFiles.length) return;
+
         const filteredFiles = this.filterOut(this.fileManager.originalFiles);
         // console.log(filteredFiles.length);
 
@@ -207,40 +218,104 @@ class FilterManager {
 
     loadFilterState() {
         const savedState = localStorage.getItem('adminFilters');
-        if (savedState) {
-            this.filters = JSON.parse(savedState);
+        if (!savedState) return;
+
+        try {
+            const parsed = JSON.parse(savedState);
+            this.filters = this.reconstructFilters(parsed);
             this.applyFilters();
-            this.renderAllFilterStates();
+        } catch (error) {
+            console.error('Failed to load filters:', error);
+            localStorage.removeItem('adminFilters');
         }
     }
 
+    clearFilterState() {
+        // Reset all filter states
+        Object.keys(this.filters).forEach(filterName => {
+            const filter = this.filters[filterName];
+
+            // Reset state machine
+            filter.state = 'neutral';
+
+            // Clear any stored values for group filters
+            if (filter.mode === 'twostate') {
+                filter.values = [];
+            }
+        });
+
+        // Update UI components
+        this.renderAllFilterStates();
+
+        // Apply empty filters to show all items
+        this.applyFilters();
+
+        // Persist the cleared state
+        this.saveFilterState();
+
+        // Clear visual selections
+        document.querySelectorAll('.filter-item, .class-filter-item').forEach(item => {
+            item.classList.remove(
+                'filter-forced',
+                'filter-discarded',
+                'filter-active'
+            );
+            item.dataset.state = 'neutral';
+        });
+
+        this.saveFilterState();
+    }
+
+    // Properly reconstruct filter objects
+    reconstructFilters(parsed) {
+        return Object.entries(parsed).reduce((acc, [name, filter]) => {
+            acc[name] = {
+                mode: filter.mode || 'tristate',
+                state: filter.state || 'neutral',
+                values: filter.values ? [...filter.values] : []
+            };
+            return acc;
+        }, {});
+    }
+
     renderAllFilterStates() {
-        Object.entries(this.filters).forEach(([filterName, filter]) => {
-            const items = document.querySelectorAll(`
-                .filter-item[data-filter="${filterName}"],
-                .class-filter-item[data-filter="${filterName}"]
+        Object.entries(this.filters).forEach(([name, filter]) => {
+            const elements = document.querySelectorAll(`
+                [data-filter="${name}"][data-value],
+                [data-filter="${name}"]:not([data-value])
             `);
-            items.forEach((item) => {
-                // Determine state based on filter mode
-                let state;
-                if (filter.mode === 'twostate') { // Group with multiple values
-                    const value = item.dataset.value;
-                    state = filter.values.includes(value) ? 'forced' : 'neutral';
-                } else { // Tristate filters like indexed
-                    state = filter.state;
+
+            elements.forEach(el => {
+                if (filter.mode === 'twostate') {
+                    const value = el.dataset.value;
+                    const state = filter.values.includes(value) ? 'forced' : 'neutral';
+                    this.renderFilterState(el, state);
+                } else {
+                    this.renderFilterState(el, filter.state);
                 }
-                this.renderFilterState(item, state);
             });
         });
         this.updateSelectedFiltersDisplay();
     }
 
-    renderFilterState(item, state) {
-        item.dataset.state = state;
-        const toggle = item.querySelector('.filter-toggle');
-        if (toggle) {
-          toggle.textContent = state === 'forced' 
-            ? '✓' : state === 'discarded' ? '✕' : '○';
+    renderFilterState(element, state) {
+        if (!element) return;
+
+        element.dataset.state = state;
+
+        // Update visual indicators
+        const indicator = element.querySelector('.filter-toggle');
+        if (indicator) {
+            indicator.textContent = {
+                'neutral': '○',
+                'forced': '✓',
+                'discarded': '✕'
+            }[state];
+        }
+
+        // Update class-based filters
+        if (element.classList.contains('class-filter-item')) {
+            element.className = `class-filter-item filter-${state}`;
         }
     }
 
@@ -294,5 +369,10 @@ class FilterManager {
                 this.applyFilters();
             });
         });
+    }
+
+    sync() {
+        this.loadFilterState();
+        this.renderAllFilterStates();
     }
 }

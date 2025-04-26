@@ -87,6 +87,8 @@ class GridManager {
         } else {
             await this.loadUserData();
         }
+
+        this.filterManager.sync();
     }
 
     async loadUserData() {
@@ -221,29 +223,29 @@ class GridManager {
             }
         }, this.LONG_PRESS_DURATION);
     }
-    
+
     handleTouchMove(e) {
         if (!this.longPressTimer || this.preventDrag) return;
 
         e.preventDefault(); // Add this line
-    
+
         const touch = e.touches[0];
         const deltaX = Math.abs(touch.clientX - this.touchStartX);
         const deltaY = Math.abs(touch.clientY - this.touchStartY);
-    
+
         // Clear long-press timer on any movement
         if (deltaX > 0 || deltaY > 0) {
             clearTimeout(this.longPressTimer);
             this.longPressTimer = null;
         }
-    
+
         // Check if movement exceeds drag threshold
         if (deltaX > this.DRAG_THRESHOLD || deltaY > this.DRAG_THRESHOLD) {
             e.preventDefault(); // Prevent scrolling when drag starts
             clearTimeout(this.longPressTimer);
             this.longPressTimer = null;
             this.isDrag = true;
-    
+
             const cell = e.target.closest('.character-cell');
             if (cell) {
                 this.handleDragStart({
@@ -285,8 +287,14 @@ class GridManager {
         // Check marks
         this.grid.addEventListener('click', this.handleToggleBound);
         this.setupContextMenu();
-        
-        document.getElementById('randomOperator').addEventListener('click', () => {this.showRandomOperator()});
+
+        document.getElementById('randomOperator').addEventListener('click', () => { this.showRandomOperator() });
+
+        document.getElementById('resetFilters').addEventListener('click', () => {
+            localStorage.removeItem('adminFilters');
+            this.filterManager.clearFilterState();
+            this.filterManager.sync();
+        });
     }
 
     setupContextMenu() {
@@ -660,28 +668,28 @@ class GridManager {
         // Temporarily add to DOM to measure
         menu.style.visibility = 'hidden';
         document.body.appendChild(menu);
-    
+
         // Get menu dimensions
         const menuWidth = menu.offsetWidth;
         const menuHeight = menu.offsetHeight;
-    
+
         // Calculate adjusted position
         const viewportWidth = window.innerWidth;
         const viewportHeight = window.innerHeight;
         const safetyMargin = 8;
-    
+
         // Horizontal adjustment
         let finalX = x;
         if (x + menuWidth > viewportWidth) {
             finalX = Math.max(safetyMargin, x - menuWidth);
         }
-    
+
         // Vertical adjustment
         let finalY = y;
         if (y + menuHeight > viewportHeight) {
             finalY = Math.max(safetyMargin, y - menuHeight);
         }
-    
+
         // Apply calculated position
         menu.style.left = `${finalX}px`;
         menu.style.top = `${finalY}px`;
@@ -775,7 +783,7 @@ class GridManager {
 
         // Get currently visible operators
         const availableOperators = this.filteredFiles.filter(file => this.trueState.layout.includes(file.metadata.id));
-        
+
         if (availableOperators.length === 0) {
             this.showError('No operators available in current view');
             return;
@@ -805,16 +813,16 @@ class GridManager {
 
         document.body.appendChild(popup);
 
-    // Create popup with fade-in class
-    popup.classList.add('fading-in');
-    
-    // Update auto-close to handle animation
-    this.randomPopupTimeout = setTimeout(() => {
-        if (document.body.contains(popup)) {
-            popup.classList.add('fading-out');
-            setTimeout(() => popup.remove(), 300);
-        }
-    }, 5000);
+        // Create popup with fade-in class
+        popup.classList.add('fading-in');
+
+        // Update auto-close to handle animation
+        this.randomPopupTimeout = setTimeout(() => {
+            if (document.body.contains(popup)) {
+                popup.classList.add('fading-out');
+                setTimeout(() => popup.remove(), 300);
+            }
+        }, 5000);
     }
 
     async loadProfile() {
