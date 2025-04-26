@@ -52,8 +52,6 @@ body {
     will-change: transform;
     /* dragging smth */
     -webkit-tap-highlight-color: transparent;
-    -webkit-user-drag: none;
-    user-select: none;
     -webkit-touch-callout: none;
 }
 
@@ -89,9 +87,20 @@ body {
     object-fit: contain;
     pointer-events: none;
     /* Prevent images from blocking drag events */
-    -webkit-user-drag: none;
-    user-select: none;
     -webkit-touch-callout: none;
+    user-select: none;
+}
+
+/* Prevent ghosting on mobile only */
+@media (pointer: coarse) {
+    .character-cell {
+        -webkit-user-drag: none;
+    }
+    
+    .character-image {
+        -webkit-user-drag: none !important;
+        pointer-events: none;
+    }
 }
 
 /* Overlay Elements */

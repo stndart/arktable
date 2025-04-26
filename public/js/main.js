@@ -638,8 +638,6 @@ class GridManager {
         // Keep selection prevention but allow touch events
         menu.onselectstart = () => false;
         menu.className = 'context-menu';
-        menu.style.left = `${x}px`;
-        menu.style.top = `${y}px`;
 
         menu.innerHTML = `
             <div class="context-item" onclick="gridManager.addCircle('${cell.dataset.id}')">Add Circle</div>
@@ -657,7 +655,35 @@ class GridManager {
             `;
         }
 
+        // Temporarily add to DOM to measure
+        menu.style.visibility = 'hidden';
         document.body.appendChild(menu);
+    
+        // Get menu dimensions
+        const menuWidth = menu.offsetWidth;
+        const menuHeight = menu.offsetHeight;
+    
+        // Calculate adjusted position
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        const safetyMargin = 8;
+    
+        // Horizontal adjustment
+        let finalX = x;
+        if (x + menuWidth > viewportWidth) {
+            finalX = Math.max(safetyMargin, x - menuWidth);
+        }
+    
+        // Vertical adjustment
+        let finalY = y;
+        if (y + menuHeight > viewportHeight) {
+            finalY = Math.max(safetyMargin, y - menuHeight);
+        }
+    
+        // Apply calculated position
+        menu.style.left = `${finalX}px`;
+        menu.style.top = `${finalY}px`;
+        menu.style.visibility = 'visible';
 
         // Close menu on click outside
         setTimeout(() => {
