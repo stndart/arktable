@@ -127,16 +127,12 @@ class FilterManager {
         this.saveFilterState();
     }
 
-    applyFilters() {
-        const filteredFiles = this.fileManager.originalFiles.filter(file => {
+    filterOut(originalFiles) {
+        return originalFiles.filter(file => {
             return Object.entries(this.filters).every(([filterName, filter]) => {
                 if (filter === 'neutral') return true;
 
                 const fileValue = this.getFileValue(filterName, file);
-
-                // if (filterName == 'class' && this.fileManager.originalFiles.indexOf(file) < 5) {
-                //     console.log(file.filename, filterName, fileValue, filter.values);
-                // }
 
                 switch (filter.state) {
                     case 'forced':
@@ -152,6 +148,10 @@ class FilterManager {
                 }
             });
         });
+    }
+
+    applyFilters() {
+        const filteredFiles = this.filterOut(this.fileManager.originalFiles);
         // console.log(filteredFiles.length);
 
         this.fileManager.renderFiles(filteredFiles);

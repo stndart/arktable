@@ -10,11 +10,23 @@ class SidebarManager {
         this.loadCharacters();
     }
 
+    updateFiltered() {
+        this.filterCharacters(document.getElementById('searchInput').value.toLowerCase());
+    }
+
     initEventListeners() {
         // Search input
         document.getElementById('searchInput').addEventListener('input', (e) => {
             this.filterCharacters(e.target.value.toLowerCase());
         });
+
+        // binding trick
+        const originalApplyFilters = this.gridManager.filterManager.applyFilters.bind(this.gridManager.filterManager);
+        this.gridManager.filterManager.applyFilters = (...args) =>  {
+            const result = originalApplyFilters(...args);
+            this.updateFiltered();
+            return result;
+        };
 
         // Overlay click
         this.overlay.addEventListener('click', () => this.toggleSidebar(false));
@@ -54,8 +66,13 @@ class SidebarManager {
         });
     }
 
+    prefilterCharacters() {
+        const pref = this.gridManager.filterManager.filterOut(this.allCharacters);
+        return pref
+    }
+
     filterCharacters(query) {
-        const filtered = this.allCharacters.filter(char =>
+        const filtered = this.prefilterCharacters().filter(char =>
             char.id.toLowerCase().includes(query) ||
             char.name.toLowerCase().includes(query)
         );

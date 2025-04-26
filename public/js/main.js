@@ -1085,5 +1085,5 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.error('Initialization error:', error);
         window.gridManager.showError('Failed to load data');
     }
-    sidebarManager = new SidebarManager(window.gridManager);
+    window.sidebarManager = new SidebarManager(window.gridManager);
 });
