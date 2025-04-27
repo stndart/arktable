@@ -44,6 +44,7 @@ class FilterManager {
         if (['class', 'rarity', 'indexed', 'mastery'].includes(filterName))
             return;
 
+        console.log("PANIC!!");
         const container = document.getElementById('extraFilters');
         values.forEach(value => {
             const option = document.createElement('div');
@@ -72,23 +73,11 @@ class FilterManager {
             this.renderFilterState(item, newState);
         } else { // filter group
             const newState = this.getNextState(currentState, 2);
-            if (filterName == 'mastery') {
-                const MASTERY_ORDER = ['e2', 'm3', 'm6', 'm9'];
-                const idx = MASTERY_ORDER.indexOf(filterValue);
-                if (newState == 'neutral') {
-                    this.filters.mastery.values =
-                        this.filters.mastery.values.filter(v => MASTERY_ORDER.indexOf(v) > idx);
-                } else {
-                    this.filters.mastery.values = MASTERY_ORDER.slice(idx);
-                }
-                console.log(`New filter values for mastery [${this.filters.mastery.values}]`);
+            if (newState == 'neutral') {
+                this.filters[filterName].values = this.filters[filterName].values.filter(item => item !== filterValue);
             } else {
-                if (newState == 'neutral') {
-                    this.filters[filterName].values = this.filters[filterName].values.filter(item => item !== filterValue);
-                } else {
-                    this.filters[filterName].values = this.filters[filterName].values.filter(item => item !== filterValue);
-                    this.filters[filterName].values.push(filterValue);
-                }
+                this.filters[filterName].values = this.filters[filterName].values.filter(item => item !== filterValue);
+                this.filters[filterName].values.push(filterValue);
             }
             this.updateFilterState(filterName, this.filters[filterName].values.length == 0 ? 'neutral' : 'forced');
 
@@ -103,8 +92,6 @@ class FilterManager {
     }
 
     setupFilterEvents() {
-        console.log("SetupFilterEvents");
-
         // Toggle filter states
         document.querySelectorAll('.filter-item, .class-filter-item, .mastery-filter-item').forEach(item => {
             item.removeEventListener('click', this.toggleFilterButton);
@@ -140,7 +127,6 @@ class FilterManager {
     }
 
     updateFilterState(filterName, newState) {
-        console.log(`updateFilterState ${filterName} to ${newState}`);
         try {
             if (!this.filters[filterName]) {
                 console.error(`Filter ${filterName} not found`);
@@ -164,6 +150,10 @@ class FilterManager {
 
                 const fileValue = this.getFileValue(filterName, file);
 
+                if (filterName == 'mastery' && filter.state == 'forced') {
+                    const MASTERYOPTIONS = ['e2', 'm3', 'm6', 'm9'];
+                    return filter.values.includes(MASTERYOPTIONS[fileValue]);
+                }
                 switch (filter.state) {
                     case 'forced':
                         return filter.values.length === 0
@@ -194,6 +184,11 @@ class FilterManager {
         switch (filterName) {
             case 'class': return metadata.class;
             case 'indexed': return !!file.indexed;
+            case 'mastery': {
+                const marks = this.fileManager.trueState?.marks?.[metadata.id]?.circles ?? -1;
+                if (marks != 0) return marks;
+                return this.fileManager.trueState?.marks?.[metadata.id]?.checks ? 0 : -1;
+            }
             default: return metadata[filterName]?.toString();
         }
     }
@@ -243,7 +238,8 @@ class FilterManager {
 
         try {
             const parsed = JSON.parse(savedState);
-            this.filters = this.reconstructFilters(parsed);
+            if (!this.filters) this.filters = {};
+            Object.assign(this.filters, this.reconstructFilters(parsed));
             this.applyFilters();
         } catch (error) {
             console.error('Failed to load filters:', error);
@@ -323,7 +319,6 @@ class FilterManager {
         if (!element) return;
 
         element.dataset.state = state;
-        console.log(`Render filter ${element.dataset.value} state ${state}`)
 
         // Update visual indicators
         const indicator = element.querySelector('.filter-toggle');
@@ -376,7 +371,7 @@ class FilterManager {
     updateSelectedFiltersDisplay() {
         const container = document.getElementById('selectedFilters');
         container.innerHTML = Object.entries(this.filters)
-            .filter(([filterName, filter]) => filter.values.length > 0 && !['class', 'indexed', 'rarity'].includes(filterName))
+            .filter(([filterName, filter]) => filter.values.length > 0 && !['class', 'indexed', 'rarity', 'mastery'].includes(filterName))
             .map(([name, filter]) =>
                 filter.values.map(value => `
             <div class="filter-item" data-filter="${name}" data-value="${value}">
