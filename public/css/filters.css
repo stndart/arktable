@@ -411,19 +411,7 @@
     border-color: transparent;
 }
 
-.mastery-filter[data-value="e2"][data-active="true"] {
-    background: #FFC107 !important;
-    color: #000;
-}
-
-.mastery-filter[data-value="m3"][data-active="true"] {
-    background: #4CAF50 !important;
-}
-
-.mastery-filter[data-value="m6"][data-active="true"] {
-    background: #2196F3 !important;
-}
-
-.mastery-filter[data-value="m9"][data-active="true"] {
-    background: #9C27B0 !important;
+.mastery-filter-item.filter-discarded {
+    background: rgba(175, 76, 80, 0.9);
+    border-color: transparent;
 }

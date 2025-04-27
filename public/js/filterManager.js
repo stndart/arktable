@@ -25,7 +25,7 @@ class FilterManager {
             // Indexed filter
             this.createFilterOptions('indexed');
         } else {
-            this.createFilterOptions('mastery', ['E2', 'M3', 'M6', 'M9']);
+            this.createFilterOptions('mastery', ['e0', 'e2', 'm3', 'm6', 'm9']);
         }
 
         // Add individual rarity filters
@@ -44,7 +44,6 @@ class FilterManager {
         if (['class', 'rarity', 'indexed', 'mastery'].includes(filterName))
             return;
 
-        console.log("PANIC!!");
         const container = document.getElementById('extraFilters');
         values.forEach(value => {
             const option = document.createElement('div');
@@ -151,8 +150,8 @@ class FilterManager {
                 const fileValue = this.getFileValue(filterName, file);
 
                 if (filterName == 'mastery' && filter.state == 'forced') {
-                    const MASTERYOPTIONS = ['e2', 'm3', 'm6', 'm9'];
-                    return filter.values.includes(MASTERYOPTIONS[fileValue]);
+                    const MASTERYOPTIONS = ['e0', 'e2', 'm3', 'm6', 'm9'];
+                        return filter.values.includes(MASTERYOPTIONS[fileValue + 1]);
                 }
                 switch (filter.state) {
                     case 'forced':
