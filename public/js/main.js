@@ -55,7 +55,7 @@ class GridManager {
         this.setupImport();
 
         this.shareManager = new ShareManager(this);
-        this.filterManager = new FilterManager(this);
+        this.filterManager = new FilterManager(this, false);
     }
 
     isMobileDevice() {

@@ -1,7 +1,8 @@
 class FilterManager {
-    constructor(fileManager) {
+    constructor(fileManager, isAdmin = true) {
         this.fileManager = fileManager;
         this.filters = {};
+        this.isAdmin = isAdmin;
 
         this.toggleFilterButton = this.toggleFilterButton.bind(this);
 
@@ -19,8 +20,13 @@ class FilterManager {
     }
 
     setupCoreFilters() {
-        // Indexed filter
-        this.createFilterOptions('indexed');
+        console.log(`isAdmin ${this.isAdmin}`);
+        if (this.isAdmin) {
+            // Indexed filter
+            this.createFilterOptions('indexed');
+        } else {
+            this.createFilterOptions('mastery', ['E2', 'M3', 'M6', 'M9']);
+        }
 
         // Add individual rarity filters
         this.createFilterOptions('rarity', ['2', '3', '4', '5', '6']);
@@ -35,8 +41,9 @@ class FilterManager {
     createFilterOptions(filterName, values = []) {
         this.filters[filterName] = { state: 'neutral', mode: values.length == 0 ? 'tristate' : 'twostate', values: [] };
 
-        if (['class', 'rarity', 'indexed'].includes(filterName))
+        if (['class', 'rarity', 'indexed', 'mastery'].includes(filterName))
             return;
+
         const container = document.getElementById('extraFilters');
         values.forEach(value => {
             const option = document.createElement('div');
@@ -50,7 +57,6 @@ class FilterManager {
 
     toggleFilterButton(e) {
         const item = e.currentTarget;
-        // if (item.classList.contains('filter-toggle')) return;
 
         const filterName = item.dataset.filter;
         const currentState = item.dataset.state;
@@ -66,27 +72,41 @@ class FilterManager {
             this.renderFilterState(item, newState);
         } else { // filter group
             const newState = this.getNextState(currentState, 2);
-
-            if (newState == 'neutral') {
-                this.filters[filterName].values = this.filters[filterName].values.filter(item => item !== filterValue);
+            if (filterName == 'mastery') {
+                const MASTERY_ORDER = ['e2', 'm3', 'm6', 'm9'];
+                const idx = MASTERY_ORDER.indexOf(filterValue);
+                if (newState == 'neutral') {
+                    this.filters.mastery.values =
+                        this.filters.mastery.values.filter(v => MASTERY_ORDER.indexOf(v) > idx);
+                } else {
+                    this.filters.mastery.values = MASTERY_ORDER.slice(idx);
+                }
+                console.log(`New filter values for mastery [${this.filters.mastery.values}]`);
             } else {
-                this.filters[filterName].values = this.filters[filterName].values.filter(item => item !== filterValue);
-                this.filters[filterName].values.push(filterValue);
+                if (newState == 'neutral') {
+                    this.filters[filterName].values = this.filters[filterName].values.filter(item => item !== filterValue);
+                } else {
+                    this.filters[filterName].values = this.filters[filterName].values.filter(item => item !== filterValue);
+                    this.filters[filterName].values.push(filterValue);
+                }
             }
             this.updateFilterState(filterName, this.filters[filterName].values.length == 0 ? 'neutral' : 'forced');
 
-            if (item.matches('.class-filter-item'))
+            // treat mastery exactly like class
+            if (item.matches('.class-filter-item, .mastery-filter-item')) {
                 this.renderClassFilterState(item, newState);
-            else
+            } else {
                 this.renderFilterState(item, newState);
+            }
         }
+
     }
 
     setupFilterEvents() {
         console.log("SetupFilterEvents");
 
         // Toggle filter states
-        document.querySelectorAll('.filter-item, .class-filter-item').forEach(item => {
+        document.querySelectorAll('.filter-item, .class-filter-item, .mastery-filter-item').forEach(item => {
             item.removeEventListener('click', this.toggleFilterButton);
             item.addEventListener('click', this.toggleFilterButton);
         });
@@ -120,6 +140,7 @@ class FilterManager {
     }
 
     updateFilterState(filterName, newState) {
+        console.log(`updateFilterState ${filterName} to ${newState}`);
         try {
             if (!this.filters[filterName]) {
                 console.error(`Filter ${filterName} not found`);
@@ -302,6 +323,7 @@ class FilterManager {
         if (!element) return;
 
         element.dataset.state = state;
+        console.log(`Render filter ${element.dataset.value} state ${state}`)
 
         // Update visual indicators
         const indicator = element.querySelector('.filter-toggle');
@@ -316,6 +338,9 @@ class FilterManager {
         // Update class-based filters
         if (element.classList.contains('class-filter-item')) {
             element.className = `class-filter-item filter-${state}`;
+        }
+        if (element.classList.contains('mastery-filter-item')) {
+            element.className = `mastery-filter-item filter-${state}`;
         }
     }
 

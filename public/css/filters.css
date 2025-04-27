@@ -371,3 +371,59 @@
         margin-right: auto;
     }
 }
+
+.mastery-filter-group {
+    display: flex;
+    gap: 1px;
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.mastery-filter-item {
+    /* mirror .class-filter-item basics */
+    padding: 6px 8px !important;
+    border-radius: 0 !important;
+    width: 40px;
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    transition: all 0.2s ease;
+    border: 2px solid transparent;
+}
+
+/* Hover states */
+.mastery-filter:not([data-active="true"]):hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.mastery-filter-item.filter-forced {
+    background: rgba(76, 175, 80, 0.9);
+    border-color: #4CAF50;
+}
+
+.mastery-filter-item.filter-neutral {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: transparent;
+}
+
+.mastery-filter[data-value="e2"][data-active="true"] {
+    background: #FFC107 !important;
+    color: #000;
+}
+
+.mastery-filter[data-value="m3"][data-active="true"] {
+    background: #4CAF50 !important;
+}
+
+.mastery-filter[data-value="m6"][data-active="true"] {
+    background: #2196F3 !important;
+}
+
+.mastery-filter[data-value="m9"][data-active="true"] {
+    background: #9C27B0 !important;
+}
