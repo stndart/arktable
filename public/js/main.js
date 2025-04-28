@@ -622,7 +622,7 @@ class GridManager {
             const cell = this.createCharacterCell(character);
             this.grid.appendChild(cell);
             this.trueState.layout.push(character.id);
-            this.trueState.marks[character.id] = { checks: false, marks: 0 };
+            this.trueState.marks[character.id] = { checks: false, circles: 0 };
             this.saveState();
         }
     }
