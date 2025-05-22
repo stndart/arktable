@@ -28,6 +28,8 @@ class GridManager {
         }
         console.log("is editable?", this.isEditable);
 
+        this.isTap = false;
+
         this.grid = document.getElementById('characterGrid');
 
         this.originalFiles = []; // Will store all characters
@@ -284,8 +286,22 @@ class GridManager {
 
         // document.getElementById('share').addEventListener('click', () => this.shareGrid());
 
-        // Check marks
-        this.grid.addEventListener('click', this.handleToggleBound);
+        // Modified click handling
+        if (this.isMobileDevice()) {
+            // Mobile: click opens context menu
+            this.grid.addEventListener('click', (e) => {
+                const cell = e.target.closest('.character-cell');
+                if (cell && this.isTap) {
+                    e.preventDefault();
+                    this.showContextMenu(cell, e.clientX, e.clientY);
+                }
+                this.isTap = false;
+            });
+        } else {
+            // Desktop: click toggles checkmark
+            this.grid.addEventListener('click', this.handleToggleBound);
+        }
+
         this.setupContextMenu();
 
         document.getElementById('randomOperator').addEventListener('click', () => { this.showRandomOperator() });
@@ -626,6 +642,11 @@ class GridManager {
             this.saveState();
         }
     }
+    
+    toggleCheckMarkFromMenu(charId) {
+        const cell = this.grid.querySelector(`[data-id="${charId}"]`);
+        if (cell) this.toggleCheckMark(cell);
+    }
 
     toggleCheckMark(cell) {
         const checkMark = cell.querySelector('.check-mark');
@@ -648,8 +669,20 @@ class GridManager {
         // Keep selection prevention but allow touch events
         menu.onselectstart = () => false;
         menu.className = 'context-menu';
+        
+        const isMobile = this.isMobileDevice();
+        menu.menuHTML = '';
 
-        menu.innerHTML = `
+        if (isMobile) {
+            menu.menuHTML += `
+                <div class="context-item" 
+                     onclick="gridManager.toggleCheckMarkFromMenu('${cell.dataset.id}')">
+                    Toggle Checkmark
+                </div>
+            `;
+        }
+
+        menu.innerHTML += `
             <div class="context-item" onclick="gridManager.addCircle('${cell.dataset.id}')">Add Circle</div>
             <div class="context-item" onclick="gridManager.removeCircle('${cell.dataset.id}')">Remove Circle</div>
         `;
