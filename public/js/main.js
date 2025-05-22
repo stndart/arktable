@@ -680,7 +680,6 @@ class GridManager {
         const isMobile = this.isMobileDevice();
         menu.innerHTML = '';
 
-        this.showSuccess("Mobile context!");
         if (isMobile) {
             menu.innerHTML += `
                 <div class="context-item" 
