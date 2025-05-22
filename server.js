@@ -214,9 +214,11 @@ app.post('/api/import', async (req, res) => {
         }
 
         // Validate skins structure
-        const allSkinIdsValid = skins.every(id => validCharIds.has(id));
-        if (!allSkinIdsValid) {
-            return res.status(400).json({ error: 'Some skins character IDs do not exist' });
+        if (Object.keys(skins).length > 0) {
+            const allSkinIdsValid = skins.every(id => validCharIds.has(id));
+            if (!allSkinIdsValid) {
+                return res.status(400).json({ error: 'Some skins character IDs do not exist' });
+            }
         }
 
         // Validate each mark entry:
@@ -649,7 +651,7 @@ async function addSkin(characters, idExists, originalFile, id, name, charClass, 
     }
 
     const newFilename = `${id}_skin${nextNumber}.png`;
-    
+
     // Rename the file and handle errors
     let success = true;
     let error;

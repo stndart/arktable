@@ -68,7 +68,17 @@ class GridManager {
         this.characterMap = new Map();
 
         this.handleDeleteBound = this.handleDelete.bind(this); // Store bound function once
-        this.handleToggleBound = this.handleToggle.bind(this); // Store bound function once
+
+
+        // Modified click handling
+        if (this.isMobileDevice()) {
+            this.showSuccess("Mobile!")
+            // Mobile: click opens context menu
+            this.handleToggleBound = this.showExtendedContextMenu.bind(this);
+        } else {
+            // Desktop: click toggles checkmark
+            this.handleToggleBound = this.handleToggle.bind(this); // Store bound function once
+        }
 
         if (this.isEditable) {
             this.setupCoreEvents();
@@ -287,20 +297,9 @@ class GridManager {
         // document.getElementById('share').addEventListener('click', () => this.shareGrid());
 
         // Modified click handling
-        if (this.isMobileDevice()) {
-            // Mobile: click opens context menu
-            this.grid.addEventListener('click', (e) => {
-                const cell = e.target.closest('.character-cell');
-                if (cell && this.isTap) {
-                    e.preventDefault();
-                    this.showContextMenu(cell, e.clientX, e.clientY);
-                }
-                this.isTap = false;
-            });
-        } else {
-            // Desktop: click toggles checkmark
-            this.grid.addEventListener('click', this.handleToggleBound);
-        }
+        // Mobile: click opens context menu
+        // Desktop: click toggles checkmark
+        this.grid.addEventListener('click', this.handleToggleBound);
 
         this.setupContextMenu();
 
@@ -642,7 +641,7 @@ class GridManager {
             this.saveState();
         }
     }
-    
+
     toggleCheckMarkFromMenu(charId) {
         const cell = this.grid.querySelector(`[data-id="${charId}"]`);
         if (cell) this.toggleCheckMark(cell);
@@ -653,6 +652,14 @@ class GridManager {
         checkMark.style.display = checkMark.style.display === 'none' ? 'block' : 'none';
         this.trueState.marks[cell.dataset.id].checks = !(checkMark.style.display === 'none');
         this.saveState();
+    }
+
+    showExtendedContextMenu(e) {
+        const cell = e.target.closest('.character-cell');
+        if (cell) {
+            e.preventDefault();
+            this.showContextMenu(cell, e.clientX, e.clientY);
+        }
     }
 
     showContextMenu(cell, x, y) {
@@ -669,12 +676,13 @@ class GridManager {
         // Keep selection prevention but allow touch events
         menu.onselectstart = () => false;
         menu.className = 'context-menu';
-        
-        const isMobile = this.isMobileDevice();
-        menu.menuHTML = '';
 
+        const isMobile = this.isMobileDevice();
+        menu.innerHTML = '';
+
+        this.showSuccess("Mobile context!");
         if (isMobile) {
-            menu.menuHTML += `
+            menu.innerHTML += `
                 <div class="context-item" 
                      onclick="gridManager.toggleCheckMarkFromMenu('${cell.dataset.id}')">
                     Toggle Checkmark
