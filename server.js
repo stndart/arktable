@@ -528,6 +528,39 @@ app.get('/admin/files', adminAuth, async (req, res) => {
     }
 });
 
+// Helper function to get used skin numbers from both database and filesystem
+async function getUsedSkinNumbers(characterId) {
+    const usedNumbers = new Set();
+    
+    // Check database
+    const character = charData.characters.find(c => c.id === characterId);
+    if (character && character.skins) {
+        for (const alt of character.skins.alternates || []) {
+            const match = alt.match(/_skin(\d+)\.png$/);
+            if (match) {
+                usedNumbers.add(parseInt(match[1], 10));
+            }
+        }
+    }
+    
+    // Check filesystem for orphaned files
+    try {
+        const files = await fs.readdir(CHARACTERS_DIR);
+        for (const file of files) {
+            if (file.startsWith(`${characterId}_skin`) && file.endsWith('.png')) {
+                const match = file.match(/_skin(\d+)\.png$/);
+                if (match) {
+                    usedNumbers.add(parseInt(match[1], 10));
+                }
+            }
+        }
+    } catch (error) {
+        console.warn(`Failed to check filesystem for character ${characterId}:`, error);
+    }
+    
+    return Array.from(usedNumbers);
+}
+
 async function changeID(characters, originalFile, id) {
     const oldChar = characters.find(c =>
         c.skins.default === originalFile ||
@@ -551,10 +584,21 @@ async function changeID(characters, originalFile, id) {
         await renameFile(oldChar.skins.default, newDefaultName);
         newSkins.default = newDefaultName;
 
-        // Process alternate skins with sequential numbering
+        // Get used skin numbers from filesystem to avoid conflicts
+        const usedNumbers = await getUsedSkinNumbers(id);
+        
+        // Process alternate skins with gap-checking to avoid overwriting existing files
         for (let i = 0; i < oldChar.skins.alternates.length; i++) {
             const altSkin = oldChar.skins.alternates[i];
-            const newName = `${id}_skin${i + 1}.png`;
+            
+            // Find next available number
+            let nextNumber = 1;
+            while (usedNumbers.includes(nextNumber)) {
+                nextNumber++;
+            }
+            
+            const newName = `${id}_skin${nextNumber}.png`;
+            usedNumbers.push(nextNumber); // Mark as used for next iteration
             await renameFile(altSkin, newName);
             newSkins.alternates.push(newName);
         }
@@ -637,13 +681,8 @@ async function addSkin(characters, idExists, originalFile, id, name, charClass, 
     //     return { error: "Field mismatch for skin addition" };
     // }
 
-    let usedNumbers = [];
-    for (const alt of idExists.skins.alternates) {
-        const match = alt.match(/_skin(\d+)\.png$/);
-        if (match) {
-            usedNumbers.push(parseInt(match[1], 10));
-        }
-    }
+    // Get used skin numbers from both database and filesystem
+    const usedNumbers = await getUsedSkinNumbers(id);
 
     let nextNumber = 1;
     while (usedNumbers.includes(nextNumber)) {
@@ -801,7 +840,15 @@ app.post('/admin/upload-skin', adminAuth, upload.single('skin'), async (req, res
         // Move uploaded file to characters directory
         const ext = path.extname(req.file.originalname);
 
-        const newFilename = `${characterId}_skin${character.skins.alternates.length + 1}${ext}`;
+        // Find next available skin number (check for gaps from deleted skins and orphaned files)
+        const usedNumbers = await getUsedSkinNumbers(characterId);
+
+        let nextNumber = 1;
+        while (usedNumbers.includes(nextNumber)) {
+            nextNumber++;
+        }
+
+        const newFilename = `${characterId}_skin${nextNumber}${ext}`;
         await renameFile(
             req.file.path,
             path.join(CHARACTERS_DIR, newFilename),
