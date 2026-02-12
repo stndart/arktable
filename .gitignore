@@ -3,3 +3,10 @@ uploads/*
 
 # profile cache
 data/shared/*
+
+# hosting stuff
+node_modules/
+package-lock.json
+package.json
+
+.env
