@@ -11,7 +11,7 @@ const chokidar = require('chokidar');
 const createHash = crypto.createHash;
 const jwt = require('jsonwebtoken');
 const { userInfo } = require('os');
-const uuidv4 = require('uuid').v4;
+const uuidv4 = () => crypto.randomUUID();
 
 const app = express();
 
