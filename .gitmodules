@@ -1,4 +1,4 @@
 [submodule "data"]
 	path = data
-	url = https://github.com/stndart/arktable-data
+	url = git@github.com:stndart/arktable-data.git
 	ignore = all
